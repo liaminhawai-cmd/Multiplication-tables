@@ -94,6 +94,7 @@
   let session = null; // active quiz session
   let timerHandle = null;
   let bannerTimeout = null;
+  let pendingAdvanceTimeout = null;
   let pendingResumeLevel = null;
   let pendingResumeMode = null;
 
@@ -112,10 +113,12 @@
   const hudScore = $("#hud-score");
   const hudStreak = $("#hud-streak");
   const timerBar = $("#timer-bar");
+  const questionCard = $("#question-card");
   const questionText = $("#question-text");
   const answerInput = $("#answer-input");
   const feedback = $("#feedback");
   const cheatBanner = $("#cheat-banner");
+  const tableHint = $("#table-hint");
   const tableContainer = $("#table-container");
   const resultsTableContainer = $("#results-table-container");
   const pauseOverlay = $("#pause-overlay");
@@ -228,36 +231,66 @@
   }
 
   // ---------- Excel-style table rendering ----------
+  // Grid and squareList levels are answered directly in the table: every data
+  // cell is a real <input>, so kids can click any cell, move between cells
+  // with the arrow keys (which only ever land on data cells, never the header
+  // row/column labels), and press Enter to check the answer and jump to a
+  // nearby unanswered cell.
   function cellId(r, c) { return `cell-${r}x${c}`; }
 
-  function buildGridTable(level) {
+  function buildGridTable(level, cells) {
     const table = document.createElement("table");
     table.className = "excel-table";
     const headRow = level.cols.map((c) => `<th>${c}</th>`).join("");
     table.innerHTML = `<thead><tr><th class="corner">×</th>${headRow}</tr></thead>`;
     const tbody = document.createElement("tbody");
-    level.rows.forEach((r) => {
+    level.rows.forEach((r, ri) => {
       const tr = document.createElement("tr");
-      const cells = level.cols.map((c) => `<td id="${cellId(r, c)}" class="cell-pending"></td>`).join("");
-      tr.innerHTML = `<th>${r}</th>${cells}`;
+      tr.appendChild(document.createElement("th")).textContent = r;
+      level.cols.forEach((c, ci) => {
+        const td = document.createElement("td");
+        td.className = "cell-data";
+        td.appendChild(buildCellInput(r, c, ri, ci, round2(r * c)));
+        tr.appendChild(td);
+        cells.push({ id: cellId(r, c), ri, ci });
+      });
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
     return table;
   }
 
-  function buildSquareListTable(level) {
+  function buildSquareListTable(level, cells) {
     const table = document.createElement("table");
     table.className = "excel-table list-table";
     table.innerHTML = `<thead><tr><th>n</th><th>n × n</th></tr></thead>`;
     const tbody = document.createElement("tbody");
-    level.values.forEach((n) => {
+    level.values.forEach((n, ri) => {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<th>${n}</th><td id="${cellId(n, n)}" class="cell-pending"></td>`;
+      tr.appendChild(document.createElement("th")).textContent = n;
+      const td = document.createElement("td");
+      td.className = "cell-data";
+      td.appendChild(buildCellInput(n, n, ri, 0, round2(n * n)));
+      tr.appendChild(td);
       tbody.appendChild(tr);
+      cells.push({ id: cellId(n, n), ri, ci: 0 });
     });
     table.appendChild(tbody);
     return table;
+  }
+
+  function buildCellInput(r, c, ri, ci, answer) {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.step = "any";
+    input.inputMode = "decimal";
+    input.autocomplete = "off";
+    input.className = "cell-input";
+    input.id = cellId(r, c);
+    input.dataset.ri = ri;
+    input.dataset.ci = ci;
+    input.dataset.answer = answer;
+    return input;
   }
 
   function buildRandomListTable() {
@@ -267,25 +300,10 @@
     return table;
   }
 
-  function buildSessionPairs(level) {
-    if (level.type === "grid") {
-      const pairs = [];
-      level.rows.forEach((r) => level.cols.forEach((c) => pairs.push({ r, c })));
-      return shuffle(pairs);
-    }
-    if (level.type === "squareList") {
-      return level.values.map((n) => ({ r: n, c: n }));
-    }
-    return null; // randomList grows on the fly
-  }
-
-  function clearActiveCell() {
-    const active = tableContainer.querySelector(".cell-active");
-    if (active) active.classList.remove("cell-active");
-  }
-
   function startSession(afterLeave) {
     if (!selectedLevel) return;
+    clearTimeout(pendingAdvanceTimeout);
+    pendingAdvanceTimeout = null;
     requestFullscreenSafe();
     const level = selectedLevel;
     session = {
@@ -297,9 +315,10 @@
       streak: 0,
       bestStreak: 0,
       current: null,
-      pairs: buildSessionPairs(level),
-      pairIndex: 0,
+      cells: [],
+      answeredCells: 0,
       listCounter: 0,
+      locked: false,
     };
     hudLevel.textContent = `${level.id} · ${selectedMode.label}`;
     hudScore.textContent = "0";
@@ -308,12 +327,19 @@
     timerBar.style.background = "";
 
     tableContainer.innerHTML = "";
-    const tableEl = level.type === "grid"
-      ? buildGridTable(level)
-      : level.type === "squareList"
-        ? buildSquareListTable(level)
-        : buildRandomListTable();
+    let tableEl;
+    if (level.type === "grid") {
+      tableEl = buildGridTable(level, session.cells);
+    } else if (level.type === "squareList") {
+      tableEl = buildSquareListTable(level, session.cells);
+    } else {
+      tableEl = buildRandomListTable();
+    }
     tableContainer.appendChild(tableEl);
+
+    const interactive = level.type !== "randomList";
+    questionCard.classList.toggle("hidden", interactive);
+    tableHint.classList.toggle("hidden", !interactive);
 
     showView("quiz");
     if (afterLeave) {
@@ -323,11 +349,109 @@
     } else {
       cheatBanner.classList.add("hidden");
     }
-    nextQuestion();
-    answerInput.value = "";
-    answerInput.focus();
+
+    if (interactive) {
+      feedback.textContent = "";
+      feedback.className = "feedback";
+      const first = document.getElementById(session.cells[0].id);
+      if (first) first.focus();
+    } else {
+      nextQuestion();
+      answerInput.value = "";
+      answerInput.focus();
+    }
     tick(); // immediate render
     timerHandle = setInterval(tick, 1000);
+  }
+
+  // ---------- Grid cell navigation (click / arrow keys / Enter) ----------
+  function gridDims(level) {
+    return level.type === "grid"
+      ? { rows: level.rows.length, cols: level.cols.length }
+      : { rows: level.values.length, cols: 1 };
+  }
+
+  function cellAt(level, ri, ci) {
+    if (level.type === "grid") return document.getElementById(cellId(level.rows[ri], level.cols[ci]));
+    const n = level.values[ri];
+    return document.getElementById(cellId(n, n));
+  }
+
+  function moveWithArrow(input, key) {
+    const level = session.level;
+    const { rows, cols } = gridDims(level);
+    let ri = parseInt(input.dataset.ri, 10);
+    let ci = parseInt(input.dataset.ci, 10);
+    const dRi = key === "ArrowUp" ? -1 : key === "ArrowDown" ? 1 : 0;
+    const dCi = key === "ArrowLeft" ? -1 : key === "ArrowRight" ? 1 : 0;
+    if (!dRi && !dCi) return;
+
+    let r = ri, c = ci;
+    while (true) {
+      r += dRi;
+      c += dCi;
+      if (r < 0 || r >= rows || c < 0 || c >= cols) return; // hit the edge — no header cells to land on
+      const candidate = cellAt(level, r, c);
+      if (candidate && !candidate.disabled) { candidate.focus(); return; }
+      // already-answered cell in the way — keep skipping to the next one
+    }
+  }
+
+  function moveToNearbyCell(input) {
+    const cells = session.cells;
+    const idx = cells.findIndex((cell) => cell.id === input.id);
+    for (let step = 1; step <= cells.length; step++) {
+      const next = cells[(idx + step) % cells.length];
+      const el = document.getElementById(next.id);
+      if (el && !el.disabled) { el.focus(); return; }
+    }
+  }
+
+  tableContainer.addEventListener("keydown", (e) => {
+    const input = e.target.closest("input.cell-input");
+    if (!input || !session) return;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      submitCellAnswer(input);
+    } else if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      moveWithArrow(input, e.key);
+    }
+  });
+
+  function submitCellAnswer(input) {
+    if (!session || session.locked || input.disabled || input.value === "") return;
+    session.locked = true;
+    const given = parseFloat(input.value);
+    const answer = parseFloat(input.dataset.answer);
+    const correct = Math.abs(given - answer) < 0.001;
+    session.attempted += 1;
+    if (correct) {
+      session.correct += 1;
+      session.streak += 1;
+      session.bestStreak = Math.max(session.bestStreak, session.streak);
+    } else {
+      session.streak = 0;
+      input.title = `Correct answer: ${answer}`;
+    }
+    hudScore.textContent = String(session.correct);
+    hudStreak.textContent = String(session.streak);
+
+    input.disabled = true;
+    input.classList.add(correct ? "cell-correct" : "cell-wrong");
+    session.answeredCells += 1;
+
+    const allDone = session.answeredCells >= session.cells.length;
+    pendingAdvanceTimeout = setTimeout(() => {
+      pendingAdvanceTimeout = null;
+      if (!session) return;
+      session.locked = false;
+      if (allDone) {
+        handleTableComplete();
+      } else {
+        moveToNearbyCell(input);
+      }
+    }, correct ? 150 : 500);
   }
 
   // ---------- Anti-cheat: leaving the tab/window/fullscreen pauses and blanks the level ----------
@@ -340,6 +464,8 @@
     pendingResumeMode = session.mode;
     clearInterval(timerHandle);
     timerHandle = null;
+    clearTimeout(pendingAdvanceTimeout);
+    pendingAdvanceTimeout = null;
     session = null;
 
     // Blank the screen so nothing useful is visible while they're away.
@@ -391,36 +517,19 @@
     return `${m}:${String(sec).padStart(2, "0")}`;
   }
 
+  // Only the randomList levels (decimals) use the shared question-card/input —
+  // grid and squareList levels are answered directly in their table cells.
   function nextQuestion() {
-    clearActiveCell();
-    const level = session.level;
-
-    if (level.type === "randomList") {
-      const q = level.gen();
-      session.listCounter += 1;
-      session.current = { r: null, c: null, answer: q.answer, display: q.display, rowNum: session.listCounter };
-      questionText.textContent = `${q.display} = `;
-    } else {
-      if (session.pairIndex >= session.pairs.length) {
-        handleTableComplete();
-        return;
-      }
-      const p = session.pairs[session.pairIndex];
-      const answer = round2(p.r * p.c);
-      session.current = { r: p.r, c: p.c, answer, display: `${p.r} × ${p.c}` };
-      questionText.textContent = `${session.current.display} = `;
-      const cellEl = document.getElementById(cellId(p.r, p.c));
-      if (cellEl) cellEl.classList.add("cell-active");
-    }
-
+    const q = session.level.gen();
+    session.listCounter += 1;
+    session.current = { answer: q.answer, display: q.display, rowNum: session.listCounter };
+    questionText.textContent = `${q.display} = `;
     feedback.textContent = "";
     feedback.className = "feedback";
     answerInput.value = "";
   }
 
   function handleTableComplete() {
-    feedback.textContent = "Whole table filled in!";
-    feedback.className = "feedback correct";
     endSession(false, true);
   }
 
@@ -448,21 +557,10 @@
     }
     hudScore.textContent = String(session.correct);
     hudStreak.textContent = String(session.streak);
+    appendRandomListRow(session.current, answerInput.value, correct);
 
-    if (session.level.type === "randomList") {
-      appendRandomListRow(session.current, answerInput.value, correct);
-    } else {
-      const cellEl = document.getElementById(cellId(session.current.r, session.current.c));
-      if (cellEl) {
-        cellEl.textContent = answerInput.value;
-        cellEl.classList.remove("cell-pending", "cell-active");
-        cellEl.classList.add(correct ? "cell-correct" : "cell-wrong");
-        if (!correct) cellEl.title = `Correct answer: ${session.current.answer}`;
-      }
-      session.pairIndex += 1;
-    }
-
-    setTimeout(() => {
+    pendingAdvanceTimeout = setTimeout(() => {
+      pendingAdvanceTimeout = null;
       if (session) {
         session.locked = false;
         nextQuestion();
@@ -486,6 +584,8 @@
   function endSession(quit, completed) {
     clearInterval(timerHandle);
     timerHandle = null;
+    clearTimeout(pendingAdvanceTimeout);
+    pendingAdvanceTimeout = null;
     if (!session) { showView("select"); return; }
 
     const accuracy = session.attempted > 0 ? Math.round((session.correct / session.attempted) * 100) : 0;
