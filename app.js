@@ -2,23 +2,41 @@
   "use strict";
 
   // ---------- Level definitions (mirrors the original workbook's sheets) ----------
-  // type "grid": a full rows × cols Excel-style multiplication grid, filled in as you answer.
-  // type "squareList": a fixed n / n×n column, filled top to bottom.
-  // type "randomList": an open-ended generated list (used for decimals), which grows as you answer.
+  // Every level is a full multiplication grid over `axis` — exactly like the
+  // spreadsheets, which always show the whole table. `target(r, c)` marks the
+  // highlighted cells that are actually the task; those show the question
+  // ("6 × 6") faintly and are typed over. Big Picture mode trims away rows and
+  // columns that contain no target cells.
+  const DECIMAL_AXIS = [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2];
+  const between = (v, lo, hi) => v >= lo - 1e-9 && v <= hi + 1e-9;
+
   const LEVELS = [
-    { id: "A", name: "1–5 × 1–5", desc: "Small numbers warm-up", type: "grid", rows: range(1, 5), cols: range(1, 5) },
-    { id: "B", name: "Evens", desc: "2, 4, 6, 8, 10 tables", type: "grid", rows: evens(2, 10), cols: evens(2, 10) },
-    { id: "C", name: "6–9 × 3–5", desc: "Mid-range mix", type: "grid", rows: range(6, 9), cols: range(3, 5) },
-    { id: "D", name: "7s and 9s", desc: "Focus on 7 and 9 tables", type: "grid", rows: [7, 9], cols: range(1, 12) },
-    { id: "E", name: "6–10 × 6–10", desc: "Higher numbers", type: "grid", rows: range(6, 10), cols: range(6, 10) },
-    { id: "F", name: "Odd × Odd", desc: "Odd numbers only", type: "grid", rows: odds(1, 11), cols: odds(1, 11) },
-    { id: "G", name: "Squares to 15", desc: "n × n up to 15", type: "squareList", values: range(1, 15) },
-    { id: "FULL", name: "Full 12×12", desc: "Every table 1–12", type: "grid", rows: range(1, 12), cols: range(1, 12) },
-    { id: "H", name: "Squares to 25", desc: "Extension: n × n up to 25", type: "squareList", values: range(1, 25) },
-    { id: "I", name: "Squares to 30", desc: "Extension: n × n up to 30", type: "squareList", values: range(1, 30) },
-    { id: "J", name: "Decimals ×1dp", desc: "e.g. 0.3 × 6", type: "randomList", gen: () => decimalTimesInt(1) },
-    { id: "K", name: "Decimals ×2dp", desc: "e.g. 0.24 × 5", type: "randomList", gen: () => decimalTimesInt(2) },
-    { id: "L", name: "Decimal × Decimal", desc: "e.g. 0.4 × 0.6", type: "randomList", gen: () => decimalTimesDecimal() },
+    { id: "A", name: "1–5 × 1–5", desc: "Small numbers warm-up",
+      axis: range(1, 12), target: (r, c) => r <= 5 && c <= 5 },
+    { id: "B", name: "Evens", desc: "Even times tables",
+      axis: range(1, 12), target: (r, c) => r % 2 === 0 && c % 2 === 0 },
+    { id: "C", name: "6–9 × 3–5", desc: "Mid-range mix",
+      axis: range(1, 12), target: (r, c) => between(r, 6, 9) && between(c, 3, 5) },
+    { id: "D", name: "7s and 9s", desc: "Focus on the 7 and 9 tables",
+      axis: range(1, 12), target: (r, c) => r === 7 || r === 9 || c === 7 || c === 9 },
+    { id: "E", name: "6–10 × 6–10", desc: "Higher numbers",
+      axis: range(1, 12), target: (r, c) => between(r, 6, 10) && between(c, 6, 10) },
+    { id: "F", name: "Odd × Odd", desc: "Odd numbers only",
+      axis: range(1, 12), target: (r, c) => r % 2 !== 0 && c % 2 !== 0 },
+    { id: "G", name: "Squares to 15", desc: "n × n up to 15",
+      axis: range(1, 15), target: (r, c) => r === c },
+    { id: "FULL", name: "Full 12×12", desc: "Every table 1–12",
+      axis: range(1, 12), target: () => true },
+    { id: "H", name: "Squares to 25", desc: "Extension: n × n from 11 to 25",
+      axis: range(11, 25), target: (r, c) => r === c },
+    { id: "I", name: "Squares to 30", desc: "Extension: n × n from 16 to 30",
+      axis: range(16, 30), target: (r, c) => r === c },
+    { id: "J", name: "Decimals (all)", desc: "Every decimal pair 0.2–2",
+      axis: DECIMAL_AXIS, target: () => true },
+    { id: "K", name: "Decimals 0.2–1", desc: "Smaller decimal pairs",
+      axis: DECIMAL_AXIS, target: (r, c) => between(r, 0.2, 1) && between(c, 0.2, 1) },
+    { id: "L", name: "Decimals 0.6–1.4", desc: "Middle decimal pairs",
+      axis: DECIMAL_AXIS, target: (r, c) => between(r, 0.6, 1.4) && between(c, 0.6, 1.4) },
   ];
 
   const TIMER_MODES = [
@@ -31,35 +49,6 @@
     const out = [];
     for (let i = a; i <= b; i++) out.push(i);
     return out;
-  }
-  function evens(a, b) { return range(a, b).filter((n) => n % 2 === 0); }
-  function odds(a, b) { return range(a, b).filter((n) => n % 2 !== 0); }
-  function shuffle(arr) {
-    const out = arr.slice();
-    for (let i = out.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [out[i], out[j]] = [out[j], out[i]];
-    }
-    return out;
-  }
-
-  // Grid/squareList levels look like a real reference chart: most cells show
-  // their answer already, only a subset are blanked out to be solved.
-  function pickBlankIndices(total) {
-    const count = Math.min(total, Math.max(6, Math.round(total * 0.3)));
-    return new Set(shuffle(range(0, total - 1)).slice(0, count));
-  }
-
-  function decimalTimesInt(dp) {
-    const frac = Math.floor(Math.random() * (dp === 1 ? 9 : 99)) + 1;
-    const a = round2(parseFloat(`0.${dp === 1 ? frac : String(frac).padStart(2, "0")}`));
-    const b = Math.floor(Math.random() * 9) + 2;
-    return { a, b, answer: round2(a * b), display: `${a} × ${b}` };
-  }
-  function decimalTimesDecimal() {
-    const a = round2((Math.floor(Math.random() * 9) + 1) / 10);
-    const b = round2((Math.floor(Math.random() * 9) + 1) / 10);
-    return { a, b, answer: round2(a * b), display: `${a} × ${b}` };
   }
   function round2(n) { return Math.round(n * 100) / 100; }
 
@@ -121,10 +110,6 @@
   const hudScore = $("#hud-score");
   const hudStreak = $("#hud-streak");
   const timerBar = $("#timer-bar");
-  const questionCard = $("#question-card");
-  const questionText = $("#question-text");
-  const answerInput = $("#answer-input");
-  const feedback = $("#feedback");
   const cheatBanner = $("#cheat-banner");
   const tableHint = $("#table-hint");
   const bigPictureControl = $("#big-picture-control");
@@ -245,35 +230,42 @@
   }
 
   // ---------- Excel-style table rendering ----------
-  // Grid and squareList levels are answered directly in the table: every data
-  // cell is a real <input>, so kids can click any cell, move between cells
-  // with the arrow keys (which only ever land on data cells, never the header
-  // row/column labels), and press Enter to check the answer and jump to a
-  // nearby unanswered cell.
-  function cellId(r, c) { return `cell-${r}x${c}`; }
+  // The whole grid is always drawn, exactly like the spreadsheets. Highlighted
+  // target cells are real <input>s showing the question ("6 × 6") as faint
+  // ghost text you type over; the rest are plain reference cells showing their
+  // question too, so the sheet reads the same but only the task is editable.
+  function cellId(ri, ci) { return `cell-${ri}-${ci}`; }
+  function fmt(n) { return String(round2(n)); }
 
-  function buildGridTable(level, blankCells) {
-    const total = level.rows.length * level.cols.length;
-    const blanks = pickBlankIndices(total);
+  // Big Picture mode drops rows/columns that contain no target cells, so a
+  // level like "1-5 x 1-5" collapses from the full 12x12 down to just its block.
+  function visibleAxes(level) {
+    if (!bigPictureMode) return { rows: level.axis, cols: level.axis };
+    return {
+      rows: level.axis.filter((r) => level.axis.some((c) => level.target(r, c))),
+      cols: level.axis.filter((c) => level.axis.some((r) => level.target(r, c))),
+    };
+  }
+
+  function buildGridTable(level, axisRows, axisCols, targetCells) {
     const table = document.createElement("table");
     table.className = "excel-table";
-    const headRow = level.cols.map((c) => `<th>${c}</th>`).join("");
+    const headRow = axisCols.map((c) => `<th>${fmt(c)}</th>`).join("");
     table.innerHTML = `<thead><tr><th class="corner">×</th>${headRow}</tr></thead>`;
     const tbody = document.createElement("tbody");
-    level.rows.forEach((r, ri) => {
+    axisRows.forEach((r, ri) => {
       const tr = document.createElement("tr");
-      tr.appendChild(document.createElement("th")).textContent = r;
-      level.cols.forEach((c, ci) => {
+      tr.appendChild(document.createElement("th")).textContent = fmt(r);
+      axisCols.forEach((c, ci) => {
         const td = document.createElement("td");
-        const flat = ri * level.cols.length + ci;
-        const answer = round2(r * c);
-        if (blanks.has(flat)) {
+        const question = `${fmt(r)} × ${fmt(c)}`;
+        if (level.target(r, c)) {
           td.className = "cell-data";
-          td.appendChild(buildCellInput(r, c, ri, ci, answer));
-          blankCells.push({ id: cellId(r, c), ri, ci });
+          td.appendChild(buildCellInput(ri, ci, round2(r * c), question));
+          targetCells.push({ id: cellId(ri, ci), ri, ci });
         } else {
-          td.className = "cell-given";
-          td.textContent = answer;
+          td.className = "cell-ref";
+          td.textContent = question;
         }
         tr.appendChild(td);
       });
@@ -283,63 +275,53 @@
     return table;
   }
 
-  function buildSquareListTable(level, blankCells) {
-    const total = level.values.length;
-    const blanks = pickBlankIndices(total);
-    const table = document.createElement("table");
-    table.className = "excel-table list-table";
-    table.innerHTML = `<thead><tr><th>n</th><th>n × n</th></tr></thead>`;
-    const tbody = document.createElement("tbody");
-    level.values.forEach((n, ri) => {
-      const tr = document.createElement("tr");
-      tr.appendChild(document.createElement("th")).textContent = n;
-      const td = document.createElement("td");
-      const answer = round2(n * n);
-      if (blanks.has(ri)) {
-        td.className = "cell-data";
-        td.appendChild(buildCellInput(n, n, ri, 0, answer));
-        blankCells.push({ id: cellId(n, n), ri, ci: 0 });
-      } else {
-        td.className = "cell-given";
-        td.textContent = answer;
-      }
-      tr.appendChild(td);
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    return table;
-  }
-
-  function buildCellInput(r, c, ri, ci, answer) {
+  function buildCellInput(ri, ci, answer, question) {
     const input = document.createElement("input");
     input.type = "number";
     input.step = "any";
     input.inputMode = "decimal";
     input.autocomplete = "off";
     input.className = "cell-input";
-    input.id = cellId(r, c);
+    input.id = cellId(ri, ci);
     input.dataset.ri = ri;
     input.dataset.ci = ci;
     input.dataset.answer = answer;
-    input.placeholder = answer; // faint ghost text, like a spreadsheet — typing overwrites it
+    input.dataset.question = question;
+    input.placeholder = question; // the QUESTION, faint — typing writes over it
     return input;
   }
 
-  // Big Picture mode is purely a sizing/readability toggle now — bigger cells
-  // and text for kids who need it, not a difference in what's shown.
+  // Toggling mid-level rebuilds the table (the visible rows/cols change), so
+  // carry any answers already typed across to the new layout.
   bigPictureToggle.checked = bigPictureMode;
-  tableContainer.classList.toggle("big-picture", bigPictureMode);
   bigPictureToggle.addEventListener("change", () => {
     bigPictureMode = bigPictureToggle.checked;
     localStorage.setItem("multab_big_picture", bigPictureMode ? "1" : "0");
-    tableContainer.classList.toggle("big-picture", bigPictureMode);
+    if (session) rebuildTablePreservingAnswers();
   });
 
-  function buildRandomListTable() {
-    const table = document.createElement("table");
-    table.className = "excel-table list-table";
-    table.innerHTML = `<thead><tr><th>#</th><th>Expression</th><th>Your answer</th></tr></thead><tbody id="random-list-body"></tbody>`;
-    return table;
+  function rebuildTablePreservingAnswers() {
+    const level = session.level;
+    const saved = new Map();
+    session.cells.forEach((cell) => {
+      const el = document.getElementById(cell.id);
+      if (el && el.value !== "") saved.set(`${session.axisRows[cell.ri]}x${session.axisCols[cell.ci]}`, el.value);
+    });
+
+    const { rows, cols } = visibleAxes(level);
+    session.axisRows = rows;
+    session.axisCols = cols;
+    session.cells = [];
+    tableContainer.innerHTML = "";
+    tableContainer.appendChild(buildGridTable(level, rows, cols, session.cells));
+
+    session.cells.forEach((cell) => {
+      const key = `${rows[cell.ri]}x${cols[cell.ci]}`;
+      if (saved.has(key)) document.getElementById(cell.id).value = saved.get(key);
+    });
+    updateBlanksLeftHud();
+    const firstEmpty = session.cells.find((c) => document.getElementById(c.id).value === "");
+    if (firstEmpty) document.getElementById(firstEmpty.id).focus();
   }
 
   const hudScoreLabel = hudScore.previousElementSibling;
@@ -352,17 +334,14 @@
     pendingAdvanceTimeout = null;
     requestFullscreenSafe();
     const level = selectedLevel;
+    const { rows, cols } = visibleAxes(level);
     session = {
       level,
       mode: selectedMode,
       remaining: selectedMode.seconds,
-      correct: 0,
-      attempted: 0,
-      streak: 0,
-      bestStreak: 0,
-      current: null,
+      axisRows: rows,
+      axisCols: cols,
       cells: [],
-      listCounter: 0,
       locked: false,
     };
     hudLevel.textContent = `${level.id} · ${selectedMode.label}`;
@@ -370,20 +349,10 @@
     timerBar.style.background = "";
 
     tableContainer.innerHTML = "";
-    let tableEl;
-    if (level.type === "grid") {
-      tableEl = buildGridTable(level, session.cells);
-    } else if (level.type === "squareList") {
-      tableEl = buildSquareListTable(level, session.cells);
-    } else {
-      tableEl = buildRandomListTable();
-    }
-    tableContainer.appendChild(tableEl);
+    tableContainer.appendChild(buildGridTable(level, rows, cols, session.cells));
 
-    const interactive = level.type !== "randomList";
-    questionCard.classList.toggle("hidden", interactive);
-    tableHint.classList.toggle("hidden", !interactive);
-    bigPictureControl.classList.toggle("hidden", !interactive);
+    tableHint.classList.remove("hidden");
+    bigPictureControl.classList.remove("hidden");
 
     showView("quiz");
     if (afterLeave) {
@@ -394,47 +363,30 @@
       cheatBanner.classList.add("hidden");
     }
 
-    if (interactive) {
-      // No live right/wrong feedback while playing — the HUD instead tracks
-      // how many blanks are left, so progress is visible without spoiling
-      // correctness. Everything gets graded and revealed at the end.
-      hudScoreLabel.textContent = "Left";
-      hudStreakLabel.textContent = "Blanks";
-      hudScore.textContent = String(session.cells.length);
-      hudStreak.textContent = String(session.cells.length);
-      feedback.textContent = "";
-      feedback.className = "feedback";
-      const first = document.getElementById(session.cells[0].id);
-      if (first) first.focus();
-    } else {
-      hudScoreLabel.textContent = "Score";
-      hudStreakLabel.textContent = "Streak";
-      hudScore.textContent = "0";
-      hudStreak.textContent = "0";
-      nextQuestion();
-      answerInput.value = "";
-      answerInput.focus();
-    }
+    // No live right/wrong feedback while playing — the HUD tracks how many
+    // cells are left instead, so progress shows without spoiling correctness.
+    // Everything gets graded and revealed at the end.
+    hudScoreLabel.textContent = "Left";
+    hudStreakLabel.textContent = "To do";
+    hudScore.textContent = String(session.cells.length);
+    hudStreak.textContent = String(session.cells.length);
+    const first = document.getElementById(session.cells[0].id);
+    if (first) first.focus();
+
     tick(); // immediate render
     timerHandle = setInterval(tick, 1000);
   }
 
   // ---------- Grid cell navigation (click / arrow keys / Enter) ----------
-  function gridDims(level) {
-    return level.type === "grid"
-      ? { rows: level.rows.length, cols: level.cols.length }
-      : { rows: level.values.length, cols: 1 };
-  }
-
-  function cellAt(level, ri, ci) {
-    if (level.type === "grid") return document.getElementById(cellId(level.rows[ri], level.cols[ci]));
-    const n = level.values[ri];
-    return document.getElementById(cellId(n, n));
+  // Arrow keys land only on target cells — plain reference cells hold no input,
+  // so cellAt() returns null for them and the search keeps stepping past.
+  function cellAt(ri, ci) {
+    return document.getElementById(cellId(ri, ci));
   }
 
   function moveWithArrow(input, key) {
-    const level = session.level;
-    const { rows, cols } = gridDims(level);
+    const rows = session.axisRows.length;
+    const cols = session.axisCols.length;
     let ri = parseInt(input.dataset.ri, 10);
     let ci = parseInt(input.dataset.ci, 10);
     const dRi = key === "ArrowUp" ? -1 : key === "ArrowDown" ? 1 : 0;
@@ -446,7 +398,7 @@
       r += dRi;
       c += dCi;
       if (r < 0 || r >= rows || c < 0 || c >= cols) return; // hit the edge — no header cells to land on
-      const candidate = cellAt(level, r, c);
+      const candidate = cellAt(r, c);
       if (candidate && !candidate.disabled) { candidate.focus(); return; }
       // already-answered cell in the way — keep skipping to the next one
     }
@@ -508,10 +460,6 @@
 
     // Blank the screen so nothing useful is visible while they're away.
     tableContainer.innerHTML = "";
-    questionText.textContent = "";
-    answerInput.value = "";
-    feedback.textContent = "";
-    feedback.className = "feedback";
     hudTimer.textContent = "0:00";
     hudScore.textContent = "0";
     hudStreak.textContent = "0";
@@ -543,12 +491,8 @@
     else if (pct < 50) timerBar.style.background = "linear-gradient(90deg,#fbbf24,#facc15)";
 
     if (session.remaining <= 0) {
-      if (session.level.type === "randomList") {
-        endSession(false);
-      } else {
-        const { correct, attempted } = gradeInteractiveSession();
-        finishSession({ correct, attempted, finishedEarly: false, elapsedSeconds: session.mode.seconds });
-      }
+      const { correct, attempted } = gradeInteractiveSession();
+      finishSession({ correct, attempted, finishedEarly: false, elapsedSeconds: session.mode.seconds });
       return;
     }
     session.remaining -= 1;
@@ -558,18 +502,6 @@
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return `${m}:${String(sec).padStart(2, "0")}`;
-  }
-
-  // Only the randomList levels (decimals) use the shared question-card/input —
-  // grid and squareList levels are answered directly in their table cells.
-  function nextQuestion() {
-    const q = session.level.gen();
-    session.listCounter += 1;
-    session.current = { answer: q.answer, display: q.display, rowNum: session.listCounter };
-    questionText.textContent = `${q.display} = `;
-    feedback.textContent = "";
-    feedback.className = "feedback";
-    answerInput.value = "";
   }
 
   // Nothing is graded while playing — every blank is revealed and scored only
@@ -678,112 +610,14 @@
     renderLevelGrid();
   }
 
-  $("#answer-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    submitAnswer();
-  });
-
-  function submitAnswer() {
-    if (!session || session.locked || answerInput.value === "") return;
-    session.locked = true;
-    const given = parseFloat(answerInput.value);
-    const correct = Math.abs(given - session.current.answer) < 0.001;
-    session.attempted += 1;
-    if (correct) {
-      session.correct += 1;
-      session.streak += 1;
-      session.bestStreak = Math.max(session.bestStreak, session.streak);
-      feedback.textContent = "Correct!";
-      feedback.className = "feedback correct";
-    } else {
-      session.streak = 0;
-      feedback.textContent = `Answer: ${session.current.answer}`;
-      feedback.className = "feedback wrong";
-    }
-    hudScore.textContent = String(session.correct);
-    hudStreak.textContent = String(session.streak);
-    appendRandomListRow(session.current, answerInput.value, correct);
-
-    pendingAdvanceTimeout = setTimeout(() => {
-      pendingAdvanceTimeout = null;
-      if (session) {
-        session.locked = false;
-        nextQuestion();
-      }
-      answerInput.focus();
-    }, correct ? 250 : 650);
-  }
-
-  function appendRandomListRow(current, given, correct) {
-    const body = document.getElementById("random-list-body");
-    if (!body) return;
-    const tr = document.createElement("tr");
-    tr.className = correct ? "cell-correct" : "cell-wrong";
-    const answerCell = correct ? given : `${given} <small>(≠ ${current.answer})</small>`;
-    tr.innerHTML = `<td>${current.rowNum}</td><td>${current.display}</td><td>${answerCell}</td>`;
-    body.appendChild(tr);
-    const scrollHost = body.closest(".table-container");
-    if (scrollHost) scrollHost.scrollTop = scrollHost.scrollHeight;
-  }
-
-  // Handles quitting (any level type) and a randomList (decimals) timeout —
-  // those still use live per-answer feedback, unlike grid/squareList which
-  // route through finishSession() instead.
-  function endSession(quit) {
+  // Quitting abandons the attempt without grading or recording anything.
+  function endSession() {
     clearInterval(timerHandle);
     timerHandle = null;
     clearTimeout(pendingAdvanceTimeout);
     pendingAdvanceTimeout = null;
-    if (!session) { showView("select"); return; }
-
-    const accuracy = session.attempted > 0 ? Math.round((session.correct / session.attempted) * 100) : 0;
-    const stars = starsFor(session.correct, accuracy);
-    const beaten = isBeaten(session.correct, accuracy);
-
-    if (!quit) {
-      const key = progressKey(session.level.id, session.mode.id);
-      const prior = progress[key];
-      const record = {
-        levelId: session.level.id,
-        modeId: session.mode.id,
-        correct: session.correct,
-        attempted: session.attempted,
-        accuracy,
-        stars,
-        beaten: beaten || !!prior?.beaten,
-        bestStreak: session.bestStreak,
-        attempts: (prior?.attempts || 0) + 1,
-        lastPlayed: new Date().toISOString(),
-      };
-      if (!prior || betterThan(record, prior)) {
-        record.beaten = beaten || !!prior?.beaten;
-        progress[key] = record;
-      } else {
-        prior.attempts += 1;
-        prior.lastPlayed = record.lastPlayed;
-        prior.beaten = prior.beaten || beaten;
-        progress[key] = prior;
-      }
-      saveProgress(progress);
-
-      resultsTableContainer.innerHTML = "";
-      resultsTableContainer.appendChild(tableContainer.firstElementChild.cloneNode(true));
-
-      resultStreakLabel.textContent = "Best Streak";
-      $("#result-best-streak").textContent = session.bestStreak;
-      $("#results-title").textContent = beaten ? "Level beaten! 🎉" : "Time's up!";
-      $("#result-correct").textContent = session.correct;
-      $("#result-total").textContent = session.attempted;
-      $("#result-accuracy").textContent = accuracy + "%";
-      $("#result-stars").textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
-      $("#result-message").textContent = beaten
-        ? `You beat ${session.level.id} at ${session.mode.label} — that mode is now ticked off in your Report.`
-        : messageFor(stars);
-      showView("results");
-    } else {
-      showView("select");
-    }
     session = null;
+    showView("select");
     renderLevelGrid();
   }
 
@@ -791,13 +625,6 @@
     if (a.stars !== b.stars) return a.stars > b.stars;
     if (a.correct !== b.correct) return a.correct > b.correct;
     return a.accuracy > b.accuracy;
-  }
-
-  function messageFor(stars) {
-    if (stars === 3) return "Outstanding! You beat this level with full marks.";
-    if (stars === 2) return "Great work! Push for full accuracy to earn 3 stars.";
-    if (stars === 1) return "Nice start — keep practicing to level up.";
-    return "Keep going — try again to start scoring stars.";
   }
 
   // ---------- Report tab ----------
