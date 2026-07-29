@@ -335,6 +335,13 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 
 .cell-stars { color: #fbbf24; }
 .cell-empty { color: #475569; }
+.cell-practice { background: #16213a; }
+
+.timer-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
 
 .quiz-actions {
   display: flex;

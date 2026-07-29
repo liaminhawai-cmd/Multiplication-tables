@@ -25,7 +25,7 @@
       axis: range(1, 12), target: (r, c) => r % 2 !== 0 && c % 2 !== 0 },
     { id: "G", name: "Squares to 15", desc: "n × n up to 15",
       axis: range(1, 15), target: (r, c) => r === c },
-    { id: "FULL", name: "Full 12×12", desc: "Every table 1–12",
+    { id: "FULL", name: "Full 12×12", desc: "Free practice — no timer", untimed: true,
       axis: range(1, 12), target: () => true },
     { id: "H", name: "Squares to 25", desc: "Extension: n × n from 11 to 25",
       axis: range(11, 25), target: (r, c) => r === c },
@@ -40,10 +40,16 @@
   ];
 
   const TIMER_MODES = [
-    { id: "180", label: "3:00", seconds: 180 },
     { id: "90", label: "1:30", seconds: 90 },
     { id: "45", label: "0:45", seconds: 45 },
+    { id: "20", label: "0:20", seconds: 20 },
   ];
+
+  // Untimed levels get a single "Practice" slot instead of the timer tiers.
+  const FREE_MODE = { id: "free", label: "Practice", seconds: null };
+
+  function modesFor(level) { return level.untimed ? [FREE_MODE] : TIMER_MODES; }
+  const ALL_MODE_IDS = new Set([...TIMER_MODES.map((m) => m.id), FREE_MODE.id]);
 
   function range(a, b) {
     const out = [];
@@ -86,7 +92,7 @@
   // ---------- State ----------
   let progress = loadProgress();
   let selectedLevel = null;
-  let selectedMode = TIMER_MODES[1]; // default 1:30
+  let selectedMode = TIMER_MODES[0]; // default 1:30
   let session = null; // active quiz session
   let timerHandle = null;
   let bannerTimeout = null;
@@ -99,6 +105,7 @@
   const $ = (sel) => document.querySelector(sel);
   const levelGrid = $("#level-grid");
   const timerSelect = $("#timer-select");
+  const timerSelectHeading = $("#timer-select-heading");
   const startBtn = $("#start-btn");
 
   const levelSelectView = $("#level-select-view");
@@ -110,6 +117,7 @@
   const hudScore = $("#hud-score");
   const hudStreak = $("#hud-streak");
   const timerBar = $("#timer-bar");
+  const timerBarTrack = timerBar.parentElement;
   const cheatBanner = $("#cheat-banner");
   const finishBtn = $("#finish-btn");
   const finishWarning = $("#finish-warning");
@@ -152,13 +160,13 @@
       card.type = "button";
       if (selectedLevel && selectedLevel.id === lvl.id) card.classList.add("selected");
       const bestStars = bestStarsAcrossModes(lvl.id);
-      const ticks = TIMER_MODES.map((m) => {
+      const ticks = modesFor(lvl).map((m) => {
         const rec = progress[progressKey(lvl.id, m.id)];
         const beaten = !!rec?.beaten;
         return `<span class="mode-tick ${beaten ? "beaten" : ""}" title="${m.label}${beaten ? " — beaten" : ""}">${beaten ? "✓" : "·"}</span>`;
       }).join("");
       card.innerHTML = `
-        <div class="level-code">Level ${lvl.id}</div>
+        <div class="level-code">Level ${lvl.id}${lvl.untimed ? " · free" : ""}</div>
         <div class="level-name">${lvl.name}</div>
         <div class="level-stars">${bestStars > 0 ? "★".repeat(bestStars) + "☆".repeat(3 - bestStars) : ""}</div>
         <div class="level-ticks">${ticks}</div>
@@ -168,6 +176,7 @@
         requestFullscreenSafe();
         selectedLevel = lvl;
         renderLevelGrid();
+        renderTimerSelect();
         updateStartBtn();
       });
       levelGrid.appendChild(card);
@@ -175,16 +184,27 @@
   }
 
   function bestStarsAcrossModes(levelId) {
+    const level = LEVELS.find((l) => l.id === levelId);
     let best = 0;
-    TIMER_MODES.forEach((m) => {
+    modesFor(level).forEach((m) => {
       const rec = progress[progressKey(levelId, m.id)];
       if (rec && rec.stars > best) best = rec.stars;
     });
     return best;
   }
 
+  // An untimed level has no timer to choose, so the chips are replaced by a note.
   function renderTimerSelect() {
     timerSelect.innerHTML = "";
+    if (selectedLevel?.untimed) {
+      timerSelectHeading.textContent = "No timer";
+      const note = document.createElement("p");
+      note.className = "timer-note";
+      note.textContent = "Free practice — take as long as you like. The clock counts up so you can still see your time.";
+      timerSelect.appendChild(note);
+      return;
+    }
+    timerSelectHeading.textContent = "Choose a timer";
     TIMER_MODES.forEach((mode) => {
       const chip = document.createElement("button");
       chip.type = "button";
@@ -337,17 +357,20 @@
     pendingAdvanceTimeout = null;
     requestFullscreenSafe();
     const level = selectedLevel;
+    const mode = level.untimed ? FREE_MODE : selectedMode;
     const { rows, cols } = visibleAxes(level);
     session = {
       level,
-      mode: selectedMode,
-      remaining: selectedMode.seconds,
+      mode,
+      remaining: mode.seconds,
+      elapsed: 0,
       axisRows: rows,
       axisCols: cols,
       cells: [],
       locked: false,
     };
-    hudLevel.textContent = `${level.id} · ${selectedMode.label}`;
+    hudLevel.textContent = `${level.id} · ${mode.label}`;
+    timerBarTrack.classList.toggle("hidden", !!level.untimed);
     timerBar.style.width = "100%";
     timerBar.style.background = "";
 
@@ -518,6 +541,15 @@
   });
 
   function tick() {
+    if (!session) return;
+
+    // Untimed levels just count up and never expire.
+    if (session.level.untimed) {
+      hudTimer.textContent = formatTime(session.elapsed);
+      session.elapsed += 1;
+      return;
+    }
+
     hudTimer.textContent = formatTime(session.remaining);
     const pct = Math.max(0, (session.remaining / session.mode.seconds) * 100);
     timerBar.style.width = pct + "%";
@@ -565,7 +597,9 @@
     timerHandle = null;
     clearTimeout(pendingAdvanceTimeout);
     pendingAdvanceTimeout = null;
-    const elapsedSeconds = session.mode.seconds - session.remaining;
+    const elapsedSeconds = session.level.untimed
+      ? session.elapsed
+      : session.mode.seconds - session.remaining;
     const { correct, attempted } = gradeInteractiveSession();
     finishSession({ correct, attempted, finishedEarly: true, elapsedSeconds });
   }
@@ -600,14 +634,23 @@
   // finish time also beats — race through in 45s on a 3:00 attempt and all
   // three modes get ticked off at once.
   function finishSession({ correct, attempted, finishedEarly, elapsedSeconds }) {
+    // Stop the clock here too — the timer-expiry path reaches this without
+    // going through finishEarly(), and a surviving interval would tick again
+    // after session is cleared below.
+    clearInterval(timerHandle);
+    timerHandle = null;
+    clearTimeout(pendingAdvanceTimeout);
+    pendingAdvanceTimeout = null;
+
     const level = session.level;
     const mode = session.mode;
     const accuracy = attempted > 0 ? Math.round((correct / attempted) * 100) : 0;
     const stars = starsFor(correct, accuracy);
     const beatenSelected = isBeaten(correct, accuracy);
 
+    // Only timed levels earn tier ticks; free practice just records its own slot.
     const tickedModes = [];
-    if (finishedEarly && beatenSelected) {
+    if (finishedEarly && beatenSelected && !level.untimed) {
       TIMER_MODES.forEach((m) => {
         if (elapsedSeconds <= m.seconds) {
           saveLevelResult(level, m, correct, attempted, accuracy, true);
@@ -635,9 +678,11 @@
     $("#result-stars").textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
     $("#result-message").textContent = tickedModes.length > 1
       ? `You finished fast enough to beat ${tickedModes.map((m) => m.label).join(", ")} — all ticked off in your Report!`
-      : beatenSelected
-        ? `You beat ${level.id} at ${mode.label} — that mode is now ticked off in your Report.`
-        : "Not quite there — hit Retry to give it another go.";
+      : !beatenSelected
+        ? "Not quite there — hit Retry to give it another go."
+        : level.untimed
+          ? `Nice practice run on the full table — ticked off in your Report.`
+          : `You beat ${level.id} at ${mode.label} — that mode is now ticked off in your Report.`;
 
     showView("results");
     session = null;
@@ -667,8 +712,10 @@
     const headRow = $("#report-head-row");
     const body = $("#report-body");
 
-    // overview stats
-    const records = Object.values(progress);
+    // Only count records for modes that still exist — retiring a timer (e.g.
+    // the old 3:00) leaves orphaned entries that shouldn't skew the totals.
+    const records = Object.values(progress).filter((r) => ALL_MODE_IDS.has(r.modeId));
+    const totalSlots = LEVELS.reduce((sum, lvl) => sum + modesFor(lvl).length, 0);
     const levelsStarted = new Set(records.map((r) => r.levelId)).size;
     const totalStars = LEVELS.reduce((sum, lvl) => sum + bestStarsAcrossModes(lvl.id), 0);
     const totalBeaten = records.filter((r) => r.beaten).length;
@@ -679,7 +726,7 @@
 
     overview.innerHTML = `
       <div class="overview-card"><span>${levelsStarted}/${LEVELS.length}</span><label>Levels started</label></div>
-      <div class="overview-card"><span>${totalBeaten}/${LEVELS.length * TIMER_MODES.length}</span><label>Timers beaten ✓</label></div>
+      <div class="overview-card"><span>${totalBeaten}/${totalSlots}</span><label>Beaten ✓</label></div>
       <div class="overview-card"><span>${totalStars}/${LEVELS.length * 3}</span><label>Total stars</label></div>
       <div class="overview-card"><span>${totalAttempts}</span><label>Attempts logged</label></div>
       <div class="overview-card"><span>${avgAccuracy}%</span><label>Avg accuracy</label></div>
@@ -688,19 +735,25 @@
     // table head: Level | mode1 | mode2 | mode3
     headRow.innerHTML = "<th>Level</th>" + TIMER_MODES.map((m) => `<th>${m.label}</th>`).join("");
 
+    function resultCell(rec, extraClass) {
+      if (!rec) return `<td class="cell-empty${extraClass ? " " + extraClass : ""}">—</td>`;
+      const badge = rec.beaten ? '<span class="cell-beaten" title="Beaten">✓</span> ' : "";
+      return `<td${extraClass ? ` class="${extraClass}"` : ""}>${badge}<span class="cell-stars">${"★".repeat(rec.stars)}${"☆".repeat(3 - rec.stars)}</span><br><small>${rec.correct}/${rec.attempted} · ${rec.accuracy}%</small></td>`;
+    }
+
     body.innerHTML = "";
     LEVELS.forEach((lvl) => {
       const tr = document.createElement("tr");
       let html = `<td><strong>${lvl.id}</strong> — ${lvl.name}</td>`;
-      TIMER_MODES.forEach((mode) => {
-        const rec = progress[progressKey(lvl.id, mode.id)];
-        if (rec) {
-          const badge = rec.beaten ? '<span class="cell-beaten" title="Beaten">✓</span> ' : "";
-          html += `<td>${badge}<span class="cell-stars">${"★".repeat(rec.stars)}${"☆".repeat(3 - rec.stars)}</span><br><small>${rec.correct}/${rec.attempted} · ${rec.accuracy}%</small></td>`;
-        } else {
-          html += `<td class="cell-empty">—</td>`;
-        }
-      });
+      if (lvl.untimed) {
+        // One "Practice" result spanning where the timer columns would be.
+        const rec = progress[progressKey(lvl.id, FREE_MODE.id)];
+        html += resultCell(rec, "cell-practice").replace("<td", `<td colspan="${TIMER_MODES.length}"`);
+      } else {
+        TIMER_MODES.forEach((mode) => {
+          html += resultCell(progress[progressKey(lvl.id, mode.id)]);
+        });
+      }
       tr.innerHTML = html;
       body.appendChild(tr);
     });
