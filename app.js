@@ -97,6 +97,7 @@
   let pendingAdvanceTimeout = null;
   let pendingResumeLevel = null;
   let pendingResumeMode = null;
+  let bigPictureMode = localStorage.getItem("multab_big_picture") === "1";
 
   // ---------- DOM refs ----------
   const $ = (sel) => document.querySelector(sel);
@@ -119,6 +120,8 @@
   const feedback = $("#feedback");
   const cheatBanner = $("#cheat-banner");
   const tableHint = $("#table-hint");
+  const bigPictureControl = $("#big-picture-control");
+  const bigPictureToggle = $("#big-picture-toggle");
   const tableContainer = $("#table-container");
   const resultsTableContainer = $("#results-table-container");
   const pauseOverlay = $("#pause-overlay");
@@ -290,8 +293,22 @@
     input.dataset.ri = ri;
     input.dataset.ci = ci;
     input.dataset.answer = answer;
+    if (bigPictureMode) input.placeholder = answer;
     return input;
   }
+
+  function applyBigPictureMode() {
+    tableContainer.querySelectorAll(".cell-input:not(:disabled)").forEach((el) => {
+      el.placeholder = bigPictureMode ? el.dataset.answer : "";
+    });
+  }
+
+  bigPictureToggle.checked = bigPictureMode;
+  bigPictureToggle.addEventListener("change", () => {
+    bigPictureMode = bigPictureToggle.checked;
+    localStorage.setItem("multab_big_picture", bigPictureMode ? "1" : "0");
+    applyBigPictureMode();
+  });
 
   function buildRandomListTable() {
     const table = document.createElement("table");
@@ -340,6 +357,7 @@
     const interactive = level.type !== "randomList";
     questionCard.classList.toggle("hidden", interactive);
     tableHint.classList.toggle("hidden", !interactive);
+    bigPictureControl.classList.toggle("hidden", !interactive);
 
     showView("quiz");
     if (afterLeave) {
