@@ -304,6 +304,129 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 .cell-stars { color: #fbbf24; }
 .cell-empty { color: #475569; }
 
+.table-hint {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 16px 0 0;
+}
+
+.excel-table td.cell-data { padding: 0; }
+
+.cell-input {
+  width: 100%;
+  height: 100%;
+  min-width: 34px;
+  min-height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  text-align: center;
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 6px 2px;
+}
+
+.cell-input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: #1e3a5f;
+}
+
+.cell-input::-webkit-outer-spin-button,
+.cell-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.cell-input[type="number"] { -moz-appearance: textfield; }
+
+.cell-input:disabled {
+  opacity: 1;
+  -webkit-text-fill-color: currentColor;
+}
+
+.cell-input.cell-correct {
+  background: rgba(74, 222, 128, 0.22);
+  color: var(--good);
+  font-weight: 700;
+}
+
+.cell-input.cell-wrong {
+  background: rgba(248, 113, 113, 0.22);
+  color: var(--bad);
+  font-weight: 700;
+}
+
+.table-container {
+  margin-top: 20px;
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid #334155;
+}
+
+.results-table-heading {
+  margin: 20px 0 4px;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.excel-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+  background: #0b1120;
+}
+
+.excel-table th, .excel-table td {
+  border: 1px solid #334155;
+  padding: 6px 8px;
+  text-align: center;
+  min-width: 38px;
+}
+
+.excel-table.list-table th, .excel-table.list-table td {
+  min-width: 70px;
+}
+
+.excel-table thead th {
+  background: #1e293b;
+  color: var(--accent-2);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.excel-table tbody th {
+  background: #1e293b;
+  color: var(--accent-2);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.excel-table thead th.corner {
+  left: 0;
+  z-index: 3;
+  background: #111827;
+}
+
+.cell-correct {
+  background: rgba(74, 222, 128, 0.22);
+  color: var(--good);
+  font-weight: 700;
+}
+
+.cell-wrong {
+  background: rgba(248, 113, 113, 0.22);
+  color: var(--bad);
+  font-weight: 700;
+}
+
+tr.cell-correct td, tr.cell-wrong td { font-weight: 400; }
+tr.cell-correct { color: var(--good); }
+tr.cell-wrong { color: var(--bad); }
+
 .level-ticks {
   display: flex;
   gap: 6px;
@@ -332,6 +455,37 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
   color: var(--good);
   font-weight: 800;
 }
+
+.pause-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.96);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  text-align: center;
+  padding: 24px;
+}
+
+.pause-card {
+  max-width: 420px;
+}
+
+.pause-icon { font-size: 2.6rem; margin-bottom: 10px; }
+
+.pause-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.pause-sub {
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+
+.pause-card .primary-btn { margin-top: 0; width: auto; padding: 14px 40px; }
 
 .cheat-banner {
   background: #7f1d1d;

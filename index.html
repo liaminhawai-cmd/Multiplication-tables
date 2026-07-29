@@ -30,6 +30,14 @@
     </div>
 
     <div id="quiz-view" class="hidden">
+      <div id="pause-overlay" class="pause-overlay hidden">
+        <div class="pause-card">
+          <div class="pause-icon">⏸️</div>
+          <p class="pause-title">Paused — you left the game screen</p>
+          <p class="pause-sub">No calculators! Click Play to reset the timer and start the level again.</p>
+          <button id="pause-play-btn" class="primary-btn">▶ Play</button>
+        </div>
+      </div>
       <div id="cheat-banner" class="cheat-banner hidden">⚠️ You left the game screen — level restarted! No calculators allowed.</div>
       <div class="quiz-hud">
         <div class="hud-item">
@@ -51,13 +59,16 @@
       </div>
       <div class="timer-bar-track"><div id="timer-bar" class="timer-bar-fill"></div></div>
 
-      <div class="question-card">
+      <div id="question-card" class="question-card">
         <div id="question-text" class="question-text">? × ? = </div>
         <form id="answer-form">
           <input id="answer-input" type="number" step="any" inputmode="decimal" autocomplete="off" placeholder="?" />
         </form>
         <div id="feedback" class="feedback"></div>
       </div>
+
+      <p id="table-hint" class="table-hint hidden">Click any cell, or move with the arrow keys — press Enter to check your answer.</p>
+      <div id="table-container" class="table-container"></div>
 
       <button id="quit-btn" class="secondary-btn">Quit</button>
     </div>
@@ -72,6 +83,8 @@
       </div>
       <div id="result-stars" class="stars-display"></div>
       <p id="result-message"></p>
+      <h3 class="results-table-heading">Your finished table</h3>
+      <div id="results-table-container" class="table-container"></div>
       <div class="results-actions">
         <button id="retry-btn" class="primary-btn">Retry</button>
         <button id="back-btn" class="secondary-btn">Back to Levels</button>
