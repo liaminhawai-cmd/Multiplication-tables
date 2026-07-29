@@ -132,6 +132,10 @@
   const tableContainer = $("#table-container");
   const resultsTableContainer = $("#results-table-container");
   const pauseOverlay = $("#pause-overlay");
+  const installBanner = $("#install-banner");
+  const installBannerText = $("#install-banner-text");
+  const installBtn = $("#install-btn");
+  const installDismissBtn = $("#install-dismiss-btn");
 
   // ---------- Tabs ----------
   // The whole Play tab (level select, quiz, results) stays fullscreen; only
@@ -849,6 +853,55 @@
       renderLevelGrid();
     }
   });
+
+  // ---------- PWA install ----------
+  const INSTALL_DISMISSED_KEY = "multab_install_dismissed";
+  const isStandalone = window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  let deferredInstallPrompt = null;
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+
+  function showInstallBanner(text) {
+    if (isStandalone || localStorage.getItem(INSTALL_DISMISSED_KEY) === "1") return;
+    if (text) installBannerText.textContent = text;
+    installBanner.classList.remove("hidden");
+  }
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    installBtn.classList.remove("hidden");
+    showInstallBanner("📲 Install this app on your device for quick access and offline play.");
+  });
+
+  window.addEventListener("appinstalled", () => {
+    installBanner.classList.add("hidden");
+    deferredInstallPrompt = null;
+  });
+
+  installBtn.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installBanner.classList.add("hidden");
+  });
+
+  installDismissBtn.addEventListener("click", () => {
+    installBanner.classList.add("hidden");
+    localStorage.setItem(INSTALL_DISMISSED_KEY, "1");
+  });
+
+  // iOS Safari never fires beforeinstallprompt — show manual instructions instead.
+  if (isIOS && !isStandalone) {
+    installBtn.classList.add("hidden");
+    showInstallBanner("📲 Install this app: tap the Share icon, then \"Add to Home Screen\".");
+  }
 
   // ---------- Init ----------
   renderLevelGrid();
