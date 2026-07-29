@@ -411,6 +411,37 @@ tr.cell-wrong { color: var(--bad); }
   font-weight: 800;
 }
 
+.pause-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.96);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  text-align: center;
+  padding: 24px;
+}
+
+.pause-card {
+  max-width: 420px;
+}
+
+.pause-icon { font-size: 2.6rem; margin-bottom: 10px; }
+
+.pause-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.pause-sub {
+  color: var(--muted);
+  margin: 0 0 20px;
+}
+
+.pause-card .primary-btn { margin-top: 0; width: auto; padding: 14px 40px; }
+
 .cheat-banner {
   background: #7f1d1d;
   color: #fecaca;

@@ -93,8 +93,9 @@
   let selectedMode = TIMER_MODES[1]; // default 1:30
   let session = null; // active quiz session
   let timerHandle = null;
-  let restartingAfterLeave = false;
   let bannerTimeout = null;
+  let pendingResumeLevel = null;
+  let pendingResumeMode = null;
 
   // ---------- DOM refs ----------
   const $ = (sel) => document.querySelector(sel);
@@ -117,15 +118,24 @@
   const cheatBanner = $("#cheat-banner");
   const tableContainer = $("#table-container");
   const resultsTableContainer = $("#results-table-container");
+  const pauseOverlay = $("#pause-overlay");
 
   // ---------- Tabs ----------
+  // The whole Play tab (level select, quiz, results) stays fullscreen; only
+  // Report drops out of fullscreen, since it's for reviewing progress, not play.
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (btn.dataset.tab !== "play" && session) handlePotentialCheat();
       document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
       document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
       btn.classList.add("active");
       $(`#tab-${btn.dataset.tab}`).classList.add("active");
-      if (btn.dataset.tab === "report") renderReport();
+      if (btn.dataset.tab === "report") {
+        exitFullscreenSafe();
+        renderReport();
+      } else {
+        requestFullscreenSafe();
+      }
     });
   });
 
@@ -151,6 +161,7 @@
       `;
       card.title = lvl.desc;
       card.addEventListener("click", () => {
+        requestFullscreenSafe();
         selectedLevel = lvl;
         renderLevelGrid();
         updateStartBtn();
@@ -177,6 +188,7 @@
       if (selectedMode.id === mode.id) chip.classList.add("selected");
       chip.textContent = mode.label;
       chip.addEventListener("click", () => {
+        requestFullscreenSafe();
         selectedMode = mode;
         renderTimerSelect();
       });
@@ -318,22 +330,38 @@
     timerHandle = setInterval(tick, 1000);
   }
 
-  // ---------- Anti-cheat: leaving the tab/window/fullscreen resets the level ----------
+  // ---------- Anti-cheat: leaving the tab/window/fullscreen pauses and blanks the level ----------
+  // Nothing resumes automatically — the player must click Play again, which is
+  // also what lets us re-request fullscreen (browsers require a real user
+  // gesture for that, so an automatic resume couldn't re-enter fullscreen anyway).
   function handlePotentialCheat() {
-    if (!session || restartingAfterLeave) return;
-    restartingAfterLeave = true;
-    const lvl = session.level;
-    const mode = session.mode;
+    if (!session) return;
+    pendingResumeLevel = session.level;
+    pendingResumeMode = session.mode;
     clearInterval(timerHandle);
     timerHandle = null;
     session = null;
-    selectedLevel = lvl;
-    selectedMode = mode;
-    setTimeout(() => {
-      restartingAfterLeave = false;
-      startSession(true);
-    }, 30);
+
+    // Blank the screen so nothing useful is visible while they're away.
+    tableContainer.innerHTML = "";
+    questionText.textContent = "";
+    answerInput.value = "";
+    feedback.textContent = "";
+    feedback.className = "feedback";
+    hudTimer.textContent = "0:00";
+    hudScore.textContent = "0";
+    hudStreak.textContent = "0";
+    timerBar.style.width = "0%";
+    cheatBanner.classList.add("hidden");
+    pauseOverlay.classList.remove("hidden");
   }
+
+  $("#pause-play-btn").addEventListener("click", () => {
+    pauseOverlay.classList.add("hidden");
+    selectedLevel = pendingResumeLevel;
+    selectedMode = pendingResumeMode;
+    startSession(true);
+  });
 
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) handlePotentialCheat();
@@ -508,7 +536,6 @@
     } else {
       showView("select");
     }
-    exitFullscreenSafe();
     session = null;
     renderLevelGrid();
   }
