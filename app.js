@@ -2,20 +2,23 @@
   "use strict";
 
   // ---------- Level definitions (mirrors the original workbook's sheets) ----------
+  // type "grid": a full rows × cols Excel-style multiplication grid, filled in as you answer.
+  // type "squareList": a fixed n / n×n column, filled top to bottom.
+  // type "randomList": an open-ended generated list (used for decimals), which grows as you answer.
   const LEVELS = [
-    { id: "A", name: "1–5 × 1–5", desc: "Small numbers warm-up", gen: () => pair(range(1, 5), range(1, 5)) },
-    { id: "B", name: "Evens", desc: "2, 4, 6, 8, 10 tables", gen: () => pair(evens(2, 10), evens(2, 10)) },
-    { id: "C", name: "6–9 × 3–5", desc: "Mid-range mix", gen: () => pair(range(6, 9), range(3, 5)) },
-    { id: "D", name: "7s and 9s", desc: "Focus on 7 and 9 tables", gen: () => pair([7, 9], range(1, 12)) },
-    { id: "E", name: "6–10 × 6–10", desc: "Higher numbers", gen: () => pair(range(6, 10), range(6, 10)) },
-    { id: "F", name: "Odd × Odd", desc: "Odd numbers only", gen: () => pair(odds(1, 11), odds(1, 11)) },
-    { id: "G", name: "Squares to 15", desc: "n × n up to 15", gen: () => square(range(1, 15)) },
-    { id: "FULL", name: "Full 12×12", desc: "Every table 1–12", gen: () => pair(range(1, 12), range(1, 12)) },
-    { id: "H", name: "Squares to 25", desc: "Extension: n × n up to 25", gen: () => square(range(1, 25)) },
-    { id: "I", name: "Squares to 30", desc: "Extension: n × n up to 30", gen: () => square(range(1, 30)) },
-    { id: "J", name: "Decimals ×1dp", desc: "e.g. 0.3 × 6", gen: () => decimalTimesInt(1) },
-    { id: "K", name: "Decimals ×2dp", desc: "e.g. 0.24 × 5", gen: () => decimalTimesInt(2) },
-    { id: "L", name: "Decimal × Decimal", desc: "e.g. 0.4 × 0.6", gen: () => decimalTimesDecimal() },
+    { id: "A", name: "1–5 × 1–5", desc: "Small numbers warm-up", type: "grid", rows: range(1, 5), cols: range(1, 5) },
+    { id: "B", name: "Evens", desc: "2, 4, 6, 8, 10 tables", type: "grid", rows: evens(2, 10), cols: evens(2, 10) },
+    { id: "C", name: "6–9 × 3–5", desc: "Mid-range mix", type: "grid", rows: range(6, 9), cols: range(3, 5) },
+    { id: "D", name: "7s and 9s", desc: "Focus on 7 and 9 tables", type: "grid", rows: [7, 9], cols: range(1, 12) },
+    { id: "E", name: "6–10 × 6–10", desc: "Higher numbers", type: "grid", rows: range(6, 10), cols: range(6, 10) },
+    { id: "F", name: "Odd × Odd", desc: "Odd numbers only", type: "grid", rows: odds(1, 11), cols: odds(1, 11) },
+    { id: "G", name: "Squares to 15", desc: "n × n up to 15", type: "squareList", values: range(1, 15) },
+    { id: "FULL", name: "Full 12×12", desc: "Every table 1–12", type: "grid", rows: range(1, 12), cols: range(1, 12) },
+    { id: "H", name: "Squares to 25", desc: "Extension: n × n up to 25", type: "squareList", values: range(1, 25) },
+    { id: "I", name: "Squares to 30", desc: "Extension: n × n up to 30", type: "squareList", values: range(1, 30) },
+    { id: "J", name: "Decimals ×1dp", desc: "e.g. 0.3 × 6", type: "randomList", gen: () => decimalTimesInt(1) },
+    { id: "K", name: "Decimals ×2dp", desc: "e.g. 0.24 × 5", type: "randomList", gen: () => decimalTimesInt(2) },
+    { id: "L", name: "Decimal × Decimal", desc: "e.g. 0.4 × 0.6", type: "randomList", gen: () => decimalTimesDecimal() },
   ];
 
   const TIMER_MODES = [
@@ -31,19 +34,16 @@
   }
   function evens(a, b) { return range(a, b).filter((n) => n % 2 === 0); }
   function odds(a, b) { return range(a, b).filter((n) => n % 2 !== 0); }
-  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function shuffle(arr) {
+    const out = arr.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
 
-  function pair(as, bs) {
-    const a = pick(as);
-    const b = pick(bs);
-    return { a, b, answer: round2(a * b), display: `${a} × ${b}` };
-  }
-  function square(as) {
-    const a = pick(as);
-    return { a, b: a, answer: round2(a * a), display: `${a} × ${a}` };
-  }
   function decimalTimesInt(dp) {
-    const whole = Math.floor(Math.random() * 9) + 1;
     const frac = Math.floor(Math.random() * (dp === 1 ? 9 : 99)) + 1;
     const a = round2(parseFloat(`0.${dp === 1 ? frac : String(frac).padStart(2, "0")}`));
     const b = Math.floor(Math.random() * 9) + 2;
@@ -115,6 +115,8 @@
   const answerInput = $("#answer-input");
   const feedback = $("#feedback");
   const cheatBanner = $("#cheat-banner");
+  const tableContainer = $("#table-container");
+  const resultsTableContainer = $("#results-table-container");
 
   // ---------- Tabs ----------
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -213,11 +215,69 @@
     }
   }
 
+  // ---------- Excel-style table rendering ----------
+  function cellId(r, c) { return `cell-${r}x${c}`; }
+
+  function buildGridTable(level) {
+    const table = document.createElement("table");
+    table.className = "excel-table";
+    const headRow = level.cols.map((c) => `<th>${c}</th>`).join("");
+    table.innerHTML = `<thead><tr><th class="corner">×</th>${headRow}</tr></thead>`;
+    const tbody = document.createElement("tbody");
+    level.rows.forEach((r) => {
+      const tr = document.createElement("tr");
+      const cells = level.cols.map((c) => `<td id="${cellId(r, c)}" class="cell-pending"></td>`).join("");
+      tr.innerHTML = `<th>${r}</th>${cells}`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function buildSquareListTable(level) {
+    const table = document.createElement("table");
+    table.className = "excel-table list-table";
+    table.innerHTML = `<thead><tr><th>n</th><th>n × n</th></tr></thead>`;
+    const tbody = document.createElement("tbody");
+    level.values.forEach((n) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<th>${n}</th><td id="${cellId(n, n)}" class="cell-pending"></td>`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+
+  function buildRandomListTable() {
+    const table = document.createElement("table");
+    table.className = "excel-table list-table";
+    table.innerHTML = `<thead><tr><th>#</th><th>Expression</th><th>Your answer</th></tr></thead><tbody id="random-list-body"></tbody>`;
+    return table;
+  }
+
+  function buildSessionPairs(level) {
+    if (level.type === "grid") {
+      const pairs = [];
+      level.rows.forEach((r) => level.cols.forEach((c) => pairs.push({ r, c })));
+      return shuffle(pairs);
+    }
+    if (level.type === "squareList") {
+      return level.values.map((n) => ({ r: n, c: n }));
+    }
+    return null; // randomList grows on the fly
+  }
+
+  function clearActiveCell() {
+    const active = tableContainer.querySelector(".cell-active");
+    if (active) active.classList.remove("cell-active");
+  }
+
   function startSession(afterLeave) {
     if (!selectedLevel) return;
     requestFullscreenSafe();
+    const level = selectedLevel;
     session = {
-      level: selectedLevel,
+      level,
       mode: selectedMode,
       remaining: selectedMode.seconds,
       correct: 0,
@@ -225,12 +285,24 @@
       streak: 0,
       bestStreak: 0,
       current: null,
+      pairs: buildSessionPairs(level),
+      pairIndex: 0,
+      listCounter: 0,
     };
-    hudLevel.textContent = `${selectedLevel.id} · ${selectedMode.label}`;
+    hudLevel.textContent = `${level.id} · ${selectedMode.label}`;
     hudScore.textContent = "0";
     hudStreak.textContent = "0";
     timerBar.style.width = "100%";
     timerBar.style.background = "";
+
+    tableContainer.innerHTML = "";
+    const tableEl = level.type === "grid"
+      ? buildGridTable(level)
+      : level.type === "squareList"
+        ? buildSquareListTable(level)
+        : buildRandomListTable();
+    tableContainer.appendChild(tableEl);
+
     showView("quiz");
     if (afterLeave) {
       cheatBanner.classList.remove("hidden");
@@ -292,11 +364,36 @@
   }
 
   function nextQuestion() {
-    session.current = session.level.gen();
-    questionText.textContent = `${session.current.display} = `;
+    clearActiveCell();
+    const level = session.level;
+
+    if (level.type === "randomList") {
+      const q = level.gen();
+      session.listCounter += 1;
+      session.current = { r: null, c: null, answer: q.answer, display: q.display, rowNum: session.listCounter };
+      questionText.textContent = `${q.display} = `;
+    } else {
+      if (session.pairIndex >= session.pairs.length) {
+        handleTableComplete();
+        return;
+      }
+      const p = session.pairs[session.pairIndex];
+      const answer = round2(p.r * p.c);
+      session.current = { r: p.r, c: p.c, answer, display: `${p.r} × ${p.c}` };
+      questionText.textContent = `${session.current.display} = `;
+      const cellEl = document.getElementById(cellId(p.r, p.c));
+      if (cellEl) cellEl.classList.add("cell-active");
+    }
+
     feedback.textContent = "";
     feedback.className = "feedback";
     answerInput.value = "";
+  }
+
+  function handleTableComplete() {
+    feedback.textContent = "Whole table filled in!";
+    feedback.className = "feedback correct";
+    endSession(false, true);
   }
 
   $("#answer-form").addEventListener("submit", (e) => {
@@ -305,7 +402,8 @@
   });
 
   function submitAnswer() {
-    if (!session || answerInput.value === "") return;
+    if (!session || session.locked || answerInput.value === "") return;
+    session.locked = true;
     const given = parseFloat(answerInput.value);
     const correct = Math.abs(given - session.current.answer) < 0.001;
     session.attempted += 1;
@@ -322,20 +420,49 @@
     }
     hudScore.textContent = String(session.correct);
     hudStreak.textContent = String(session.streak);
+
+    if (session.level.type === "randomList") {
+      appendRandomListRow(session.current, answerInput.value, correct);
+    } else {
+      const cellEl = document.getElementById(cellId(session.current.r, session.current.c));
+      if (cellEl) {
+        cellEl.textContent = answerInput.value;
+        cellEl.classList.remove("cell-pending", "cell-active");
+        cellEl.classList.add(correct ? "cell-correct" : "cell-wrong");
+        if (!correct) cellEl.title = `Correct answer: ${session.current.answer}`;
+      }
+      session.pairIndex += 1;
+    }
+
     setTimeout(() => {
-      if (session) nextQuestion();
+      if (session) {
+        session.locked = false;
+        nextQuestion();
+      }
       answerInput.focus();
     }, correct ? 250 : 650);
   }
 
-  function endSession(quit) {
+  function appendRandomListRow(current, given, correct) {
+    const body = document.getElementById("random-list-body");
+    if (!body) return;
+    const tr = document.createElement("tr");
+    tr.className = correct ? "cell-correct" : "cell-wrong";
+    const answerCell = correct ? given : `${given} <small>(≠ ${current.answer})</small>`;
+    tr.innerHTML = `<td>${current.rowNum}</td><td>${current.display}</td><td>${answerCell}</td>`;
+    body.appendChild(tr);
+    const scrollHost = body.closest(".table-container");
+    if (scrollHost) scrollHost.scrollTop = scrollHost.scrollHeight;
+  }
+
+  function endSession(quit, completed) {
     clearInterval(timerHandle);
     timerHandle = null;
     if (!session) { showView("select"); return; }
 
     const accuracy = session.attempted > 0 ? Math.round((session.correct / session.attempted) * 100) : 0;
     const stars = starsFor(session.correct, accuracy);
-    const beaten = isBeaten(session.correct, accuracy);
+    const beaten = completed || isBeaten(session.correct, accuracy);
 
     if (!quit) {
       const key = progressKey(session.level.id, session.mode.id);
@@ -363,15 +490,20 @@
       }
       saveProgress(progress);
 
-      $("#results-title").textContent = beaten ? "Level beaten! 🎉" : "Time's up!";
+      resultsTableContainer.innerHTML = "";
+      resultsTableContainer.appendChild(tableContainer.firstElementChild.cloneNode(true));
+
+      $("#results-title").textContent = completed ? "Whole table complete! 🎉" : beaten ? "Level beaten! 🎉" : "Time's up!";
       $("#result-correct").textContent = session.correct;
       $("#result-total").textContent = session.attempted;
       $("#result-accuracy").textContent = accuracy + "%";
       $("#result-best-streak").textContent = session.bestStreak;
       $("#result-stars").textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
-      $("#result-message").textContent = beaten
-        ? `You beat ${session.level.id} at ${session.mode.label} — that mode is now ticked off in your Report.`
-        : messageFor(stars);
+      $("#result-message").textContent = completed
+        ? `You filled in the entire ${session.level.id} table with time to spare — ${session.mode.label} is ticked off in your Report.`
+        : beaten
+          ? `You beat ${session.level.id} at ${session.mode.label} — that mode is now ticked off in your Report.`
+          : messageFor(stars);
       showView("results");
     } else {
       showView("select");

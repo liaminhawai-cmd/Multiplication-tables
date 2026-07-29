@@ -304,6 +304,84 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 .cell-stars { color: #fbbf24; }
 .cell-empty { color: #475569; }
 
+.table-container {
+  margin-top: 20px;
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid #334155;
+}
+
+.results-table-heading {
+  margin: 20px 0 4px;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.excel-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.85rem;
+  background: #0b1120;
+}
+
+.excel-table th, .excel-table td {
+  border: 1px solid #334155;
+  padding: 6px 8px;
+  text-align: center;
+  min-width: 38px;
+}
+
+.excel-table.list-table th, .excel-table.list-table td {
+  min-width: 70px;
+}
+
+.excel-table thead th {
+  background: #1e293b;
+  color: var(--accent-2);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.excel-table tbody th {
+  background: #1e293b;
+  color: var(--accent-2);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.excel-table thead th.corner {
+  left: 0;
+  z-index: 3;
+  background: #111827;
+}
+
+.cell-pending { color: #475569; }
+
+.cell-active {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: #1e3a5f;
+}
+
+.cell-correct {
+  background: rgba(74, 222, 128, 0.22);
+  color: var(--good);
+  font-weight: 700;
+}
+
+.cell-wrong {
+  background: rgba(248, 113, 113, 0.22);
+  color: var(--bad);
+  font-weight: 700;
+}
+
+tr.cell-correct td, tr.cell-wrong td { font-weight: 400; }
+tr.cell-correct { color: var(--good); }
+tr.cell-wrong { color: var(--bad); }
+
 .level-ticks {
   display: flex;
   gap: 6px;
