@@ -4,6 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Multiplication Tables — Timed Practice</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0f172a" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Times Tables" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -20,6 +27,12 @@
   <section id="tab-play" class="tab-panel active">
 
     <div id="level-select-view">
+      <div id="install-banner" class="install-banner hidden">
+        <span id="install-banner-text">📲 Install this app on your device for quick access and offline play.</span>
+        <button id="install-btn" class="secondary-btn">Install</button>
+        <button id="install-dismiss-btn" class="dismiss-btn" aria-label="Dismiss">✕</button>
+      </div>
+
       <h2>Choose a level</h2>
       <div id="level-grid" class="level-grid"></div>
 
@@ -67,10 +80,10 @@
         <div id="feedback" class="feedback"></div>
       </div>
 
-      <p id="table-hint" class="table-hint hidden">Click any cell, or move with the arrow keys — press Enter to check your answer.</p>
+      <p id="table-hint" class="table-hint hidden">Fill in the blank numbers — click a cell or use the arrow keys, press Enter to move on. No feedback until you finish or time's up!</p>
       <label id="big-picture-control" class="big-picture-control hidden">
         <input type="checkbox" id="big-picture-toggle" />
-        <span>🔭 Big picture mode — fade in the whole table</span>
+        <span>🔍 Big picture mode — bigger cells for easier reading</span>
       </label>
       <div id="table-container" class="table-container"></div>
 

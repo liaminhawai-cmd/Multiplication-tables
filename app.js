@@ -43,6 +43,13 @@
     return out;
   }
 
+  // Grid/squareList levels look like a real reference chart: most cells show
+  // their answer already, only a subset are blanked out to be solved.
+  function pickBlankIndices(total) {
+    const count = Math.min(total, Math.max(6, Math.round(total * 0.3)));
+    return new Set(shuffle(range(0, total - 1)).slice(0, count));
+  }
+
   function decimalTimesInt(dp) {
     const frac = Math.floor(Math.random() * (dp === 1 ? 9 : 99)) + 1;
     const a = round2(parseFloat(`0.${dp === 1 ? frac : String(frac).padStart(2, "0")}`));
@@ -125,6 +132,10 @@
   const tableContainer = $("#table-container");
   const resultsTableContainer = $("#results-table-container");
   const pauseOverlay = $("#pause-overlay");
+  const installBanner = $("#install-banner");
+  const installBannerText = $("#install-banner-text");
+  const installBtn = $("#install-btn");
+  const installDismissBtn = $("#install-dismiss-btn");
 
   // ---------- Tabs ----------
   // The whole Play tab (level select, quiz, results) stays fullscreen; only
@@ -241,7 +252,9 @@
   // nearby unanswered cell.
   function cellId(r, c) { return `cell-${r}x${c}`; }
 
-  function buildGridTable(level, cells) {
+  function buildGridTable(level, blankCells) {
+    const total = level.rows.length * level.cols.length;
+    const blanks = pickBlankIndices(total);
     const table = document.createElement("table");
     table.className = "excel-table";
     const headRow = level.cols.map((c) => `<th>${c}</th>`).join("");
@@ -252,10 +265,17 @@
       tr.appendChild(document.createElement("th")).textContent = r;
       level.cols.forEach((c, ci) => {
         const td = document.createElement("td");
-        td.className = "cell-data";
-        td.appendChild(buildCellInput(r, c, ri, ci, round2(r * c)));
+        const flat = ri * level.cols.length + ci;
+        const answer = round2(r * c);
+        if (blanks.has(flat)) {
+          td.className = "cell-data";
+          td.appendChild(buildCellInput(r, c, ri, ci, answer));
+          blankCells.push({ id: cellId(r, c), ri, ci });
+        } else {
+          td.className = "cell-given";
+          td.textContent = answer;
+        }
         tr.appendChild(td);
-        cells.push({ id: cellId(r, c), ri, ci });
       });
       tbody.appendChild(tr);
     });
@@ -263,7 +283,9 @@
     return table;
   }
 
-  function buildSquareListTable(level, cells) {
+  function buildSquareListTable(level, blankCells) {
+    const total = level.values.length;
+    const blanks = pickBlankIndices(total);
     const table = document.createElement("table");
     table.className = "excel-table list-table";
     table.innerHTML = `<thead><tr><th>n</th><th>n × n</th></tr></thead>`;
@@ -272,11 +294,17 @@
       const tr = document.createElement("tr");
       tr.appendChild(document.createElement("th")).textContent = n;
       const td = document.createElement("td");
-      td.className = "cell-data";
-      td.appendChild(buildCellInput(n, n, ri, 0, round2(n * n)));
+      const answer = round2(n * n);
+      if (blanks.has(ri)) {
+        td.className = "cell-data";
+        td.appendChild(buildCellInput(n, n, ri, 0, answer));
+        blankCells.push({ id: cellId(n, n), ri, ci: 0 });
+      } else {
+        td.className = "cell-given";
+        td.textContent = answer;
+      }
       tr.appendChild(td);
       tbody.appendChild(tr);
-      cells.push({ id: cellId(n, n), ri, ci: 0 });
     });
     table.appendChild(tbody);
     return table;
@@ -293,21 +321,18 @@
     input.dataset.ri = ri;
     input.dataset.ci = ci;
     input.dataset.answer = answer;
-    if (bigPictureMode) input.placeholder = answer;
+    input.placeholder = answer; // faint ghost text, like a spreadsheet — typing overwrites it
     return input;
   }
 
-  function applyBigPictureMode() {
-    tableContainer.querySelectorAll(".cell-input:not(:disabled)").forEach((el) => {
-      el.placeholder = bigPictureMode ? el.dataset.answer : "";
-    });
-  }
-
+  // Big Picture mode is purely a sizing/readability toggle now — bigger cells
+  // and text for kids who need it, not a difference in what's shown.
   bigPictureToggle.checked = bigPictureMode;
+  tableContainer.classList.toggle("big-picture", bigPictureMode);
   bigPictureToggle.addEventListener("change", () => {
     bigPictureMode = bigPictureToggle.checked;
     localStorage.setItem("multab_big_picture", bigPictureMode ? "1" : "0");
-    applyBigPictureMode();
+    tableContainer.classList.toggle("big-picture", bigPictureMode);
   });
 
   function buildRandomListTable() {
@@ -316,6 +341,10 @@
     table.innerHTML = `<thead><tr><th>#</th><th>Expression</th><th>Your answer</th></tr></thead><tbody id="random-list-body"></tbody>`;
     return table;
   }
+
+  const hudScoreLabel = hudScore.previousElementSibling;
+  const hudStreakLabel = hudStreak.previousElementSibling;
+  const resultStreakLabel = $("#result-best-streak").nextElementSibling;
 
   function startSession(afterLeave) {
     if (!selectedLevel) return;
@@ -333,13 +362,10 @@
       bestStreak: 0,
       current: null,
       cells: [],
-      answeredCells: 0,
       listCounter: 0,
       locked: false,
     };
     hudLevel.textContent = `${level.id} · ${selectedMode.label}`;
-    hudScore.textContent = "0";
-    hudStreak.textContent = "0";
     timerBar.style.width = "100%";
     timerBar.style.background = "";
 
@@ -369,11 +395,22 @@
     }
 
     if (interactive) {
+      // No live right/wrong feedback while playing — the HUD instead tracks
+      // how many blanks are left, so progress is visible without spoiling
+      // correctness. Everything gets graded and revealed at the end.
+      hudScoreLabel.textContent = "Left";
+      hudStreakLabel.textContent = "Blanks";
+      hudScore.textContent = String(session.cells.length);
+      hudStreak.textContent = String(session.cells.length);
       feedback.textContent = "";
       feedback.className = "feedback";
       const first = document.getElementById(session.cells[0].id);
       if (first) first.focus();
     } else {
+      hudScoreLabel.textContent = "Score";
+      hudStreakLabel.textContent = "Streak";
+      hudScore.textContent = "0";
+      hudStreak.textContent = "0";
       nextQuestion();
       answerInput.value = "";
       answerInput.focus();
@@ -415,14 +452,29 @@
     }
   }
 
-  function moveToNearbyCell(input) {
+  // No live right/wrong feedback: Enter just confirms a value is present and
+  // moves on to a nearby still-empty blank. Everything gets graded only once
+  // the whole table is filled in or the timer runs out.
+  function moveToNearbyEmptyCell(input) {
     const cells = session.cells;
     const idx = cells.findIndex((cell) => cell.id === input.id);
     for (let step = 1; step <= cells.length; step++) {
       const next = cells[(idx + step) % cells.length];
       const el = document.getElementById(next.id);
-      if (el && !el.disabled) { el.focus(); return; }
+      if (el && el.value === "") { el.focus(); return; }
     }
+    input.blur();
+  }
+
+  function blanksRemaining() {
+    return session.cells.filter((c) => {
+      const el = document.getElementById(c.id);
+      return !el || el.value === "";
+    }).length;
+  }
+
+  function updateBlanksLeftHud() {
+    hudScore.textContent = String(blanksRemaining());
   }
 
   tableContainer.addEventListener("keydown", (e) => {
@@ -430,47 +482,15 @@
     if (!input || !session) return;
     if (e.key === "Enter") {
       e.preventDefault();
-      submitCellAnswer(input);
+      if (input.disabled || input.value === "") return;
+      moveToNearbyEmptyCell(input);
+      updateBlanksLeftHud();
+      if (blanksRemaining() === 0) finishEarly();
     } else if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
       moveWithArrow(input, e.key);
     }
   });
-
-  function submitCellAnswer(input) {
-    if (!session || session.locked || input.disabled || input.value === "") return;
-    session.locked = true;
-    const given = parseFloat(input.value);
-    const answer = parseFloat(input.dataset.answer);
-    const correct = Math.abs(given - answer) < 0.001;
-    session.attempted += 1;
-    if (correct) {
-      session.correct += 1;
-      session.streak += 1;
-      session.bestStreak = Math.max(session.bestStreak, session.streak);
-    } else {
-      session.streak = 0;
-      input.title = `Correct answer: ${answer}`;
-    }
-    hudScore.textContent = String(session.correct);
-    hudStreak.textContent = String(session.streak);
-
-    input.disabled = true;
-    input.classList.add(correct ? "cell-correct" : "cell-wrong");
-    session.answeredCells += 1;
-
-    const allDone = session.answeredCells >= session.cells.length;
-    pendingAdvanceTimeout = setTimeout(() => {
-      pendingAdvanceTimeout = null;
-      if (!session) return;
-      session.locked = false;
-      if (allDone) {
-        handleTableComplete();
-      } else {
-        moveToNearbyCell(input);
-      }
-    }, correct ? 150 : 500);
-  }
 
   // ---------- Anti-cheat: leaving the tab/window/fullscreen pauses and blanks the level ----------
   // Nothing resumes automatically — the player must click Play again, which is
@@ -523,7 +543,12 @@
     else if (pct < 50) timerBar.style.background = "linear-gradient(90deg,#fbbf24,#facc15)";
 
     if (session.remaining <= 0) {
-      endSession(false);
+      if (session.level.type === "randomList") {
+        endSession(false);
+      } else {
+        const { correct, attempted } = gradeInteractiveSession();
+        finishSession({ correct, attempted, finishedEarly: false, elapsedSeconds: session.mode.seconds });
+      }
       return;
     }
     session.remaining -= 1;
@@ -547,8 +572,110 @@
     answerInput.value = "";
   }
 
-  function handleTableComplete() {
-    endSession(false, true);
+  // Nothing is graded while playing — every blank is revealed and scored only
+  // once the table is finished (early) or the timer runs out.
+  function gradeInteractiveSession() {
+    let correct = 0;
+    session.cells.forEach((c) => {
+      const el = document.getElementById(c.id);
+      if (!el) return;
+      const answer = parseFloat(el.dataset.answer);
+      const given = parseFloat(el.value);
+      const isCorrect = el.value !== "" && Math.abs(given - answer) < 0.001;
+      if (isCorrect) {
+        correct += 1;
+      } else {
+        el.value = el.dataset.answer; // reveal the right number where they were wrong or left it blank
+      }
+      el.disabled = true;
+      el.classList.add(isCorrect ? "cell-correct" : "cell-wrong");
+    });
+    return { correct, attempted: session.cells.length };
+  }
+
+  function finishEarly() {
+    if (!session) return;
+    clearInterval(timerHandle);
+    timerHandle = null;
+    clearTimeout(pendingAdvanceTimeout);
+    pendingAdvanceTimeout = null;
+    const elapsedSeconds = session.mode.seconds - session.remaining;
+    const { correct, attempted } = gradeInteractiveSession();
+    finishSession({ correct, attempted, finishedEarly: true, elapsedSeconds });
+  }
+
+  function saveLevelResult(level, mode, correct, attempted, accuracy, beaten) {
+    const key = progressKey(level.id, mode.id);
+    const prior = progress[key];
+    const stars = starsFor(correct, accuracy);
+    const record = {
+      levelId: level.id,
+      modeId: mode.id,
+      correct,
+      attempted,
+      accuracy,
+      stars,
+      beaten: beaten || !!prior?.beaten,
+      attempts: (prior?.attempts || 0) + 1,
+      lastPlayed: new Date().toISOString(),
+    };
+    if (!prior || betterThan(record, prior)) {
+      record.beaten = beaten || !!prior?.beaten;
+      progress[key] = record;
+    } else {
+      prior.attempts += 1;
+      prior.lastPlayed = record.lastPlayed;
+      prior.beaten = prior.beaten || beaten;
+      progress[key] = prior;
+    }
+  }
+
+  // Finishing all blanks before time's up credits every timer tier the
+  // finish time also beats — race through in 45s on a 3:00 attempt and all
+  // three modes get ticked off at once.
+  function finishSession({ correct, attempted, finishedEarly, elapsedSeconds }) {
+    const level = session.level;
+    const mode = session.mode;
+    const accuracy = attempted > 0 ? Math.round((correct / attempted) * 100) : 0;
+    const stars = starsFor(correct, accuracy);
+    const beatenSelected = isBeaten(correct, accuracy);
+
+    const tickedModes = [];
+    if (finishedEarly && beatenSelected) {
+      TIMER_MODES.forEach((m) => {
+        if (elapsedSeconds <= m.seconds) {
+          saveLevelResult(level, m, correct, attempted, accuracy, true);
+          tickedModes.push(m);
+        }
+      });
+    }
+    if (!tickedModes.some((m) => m.id === mode.id)) {
+      saveLevelResult(level, mode, correct, attempted, accuracy, beatenSelected);
+    }
+    saveProgress(progress);
+
+    resultsTableContainer.innerHTML = "";
+    resultsTableContainer.appendChild(tableContainer.firstElementChild.cloneNode(true));
+
+    resultStreakLabel.textContent = "Finish time";
+    $("#result-best-streak").textContent = finishedEarly ? formatTime(elapsedSeconds) : "—";
+
+    $("#results-title").textContent = finishedEarly
+      ? `Finished in ${formatTime(elapsedSeconds)}! 🎉`
+      : beatenSelected ? "Level beaten! 🎉" : "Time's up!";
+    $("#result-correct").textContent = correct;
+    $("#result-total").textContent = attempted;
+    $("#result-accuracy").textContent = accuracy + "%";
+    $("#result-stars").textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
+    $("#result-message").textContent = tickedModes.length > 1
+      ? `You finished fast enough to beat ${tickedModes.map((m) => m.label).join(", ")} — all ticked off in your Report!`
+      : beatenSelected
+        ? `You beat ${level.id} at ${mode.label} — that mode is now ticked off in your Report.`
+        : "Not quite there — hit Retry to give it another go.";
+
+    showView("results");
+    session = null;
+    renderLevelGrid();
   }
 
   $("#answer-form").addEventListener("submit", (e) => {
@@ -599,7 +726,10 @@
     if (scrollHost) scrollHost.scrollTop = scrollHost.scrollHeight;
   }
 
-  function endSession(quit, completed) {
+  // Handles quitting (any level type) and a randomList (decimals) timeout —
+  // those still use live per-answer feedback, unlike grid/squareList which
+  // route through finishSession() instead.
+  function endSession(quit) {
     clearInterval(timerHandle);
     timerHandle = null;
     clearTimeout(pendingAdvanceTimeout);
@@ -608,7 +738,7 @@
 
     const accuracy = session.attempted > 0 ? Math.round((session.correct / session.attempted) * 100) : 0;
     const stars = starsFor(session.correct, accuracy);
-    const beaten = completed || isBeaten(session.correct, accuracy);
+    const beaten = isBeaten(session.correct, accuracy);
 
     if (!quit) {
       const key = progressKey(session.level.id, session.mode.id);
@@ -639,17 +769,16 @@
       resultsTableContainer.innerHTML = "";
       resultsTableContainer.appendChild(tableContainer.firstElementChild.cloneNode(true));
 
-      $("#results-title").textContent = completed ? "Whole table complete! 🎉" : beaten ? "Level beaten! 🎉" : "Time's up!";
+      resultStreakLabel.textContent = "Best Streak";
+      $("#result-best-streak").textContent = session.bestStreak;
+      $("#results-title").textContent = beaten ? "Level beaten! 🎉" : "Time's up!";
       $("#result-correct").textContent = session.correct;
       $("#result-total").textContent = session.attempted;
       $("#result-accuracy").textContent = accuracy + "%";
-      $("#result-best-streak").textContent = session.bestStreak;
       $("#result-stars").textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
-      $("#result-message").textContent = completed
-        ? `You filled in the entire ${session.level.id} table with time to spare — ${session.mode.label} is ticked off in your Report.`
-        : beaten
-          ? `You beat ${session.level.id} at ${session.mode.label} — that mode is now ticked off in your Report.`
-          : messageFor(stars);
+      $("#result-message").textContent = beaten
+        ? `You beat ${session.level.id} at ${session.mode.label} — that mode is now ticked off in your Report.`
+        : messageFor(stars);
       showView("results");
     } else {
       showView("select");
@@ -724,6 +853,55 @@
       renderLevelGrid();
     }
   });
+
+  // ---------- PWA install ----------
+  const INSTALL_DISMISSED_KEY = "multab_install_dismissed";
+  const isStandalone = window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  let deferredInstallPrompt = null;
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+
+  function showInstallBanner(text) {
+    if (isStandalone || localStorage.getItem(INSTALL_DISMISSED_KEY) === "1") return;
+    if (text) installBannerText.textContent = text;
+    installBanner.classList.remove("hidden");
+  }
+
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    installBtn.classList.remove("hidden");
+    showInstallBanner("📲 Install this app on your device for quick access and offline play.");
+  });
+
+  window.addEventListener("appinstalled", () => {
+    installBanner.classList.add("hidden");
+    deferredInstallPrompt = null;
+  });
+
+  installBtn.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installBanner.classList.add("hidden");
+  });
+
+  installDismissBtn.addEventListener("click", () => {
+    installBanner.classList.add("hidden");
+    localStorage.setItem(INSTALL_DISMISSED_KEY, "1");
+  });
+
+  // iOS Safari never fires beforeinstallprompt — show manual instructions instead.
+  if (isIOS && !isStandalone) {
+    installBtn.classList.add("hidden");
+    showInstallBanner("📲 Install this app: tap the Share icon, then \"Add to Home Screen\".");
+  }
 
   // ---------- Init ----------
   renderLevelGrid();
