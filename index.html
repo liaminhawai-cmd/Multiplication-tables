@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Multiplication Tables — Timed Practice</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="app-header">
+  <h1>✕ Times Tables Trainer</h1>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="play">Play</button>
+    <button class="tab-btn" data-tab="report">Report</button>
+  </nav>
+</header>
+
+<main>
+  <!-- PLAY TAB -->
+  <section id="tab-play" class="tab-panel active">
+
+    <div id="level-select-view">
+      <h2>Choose a level</h2>
+      <div id="level-grid" class="level-grid"></div>
+
+      <h2>Choose a timer</h2>
+      <div id="timer-select" class="timer-select"></div>
+
+      <button id="start-btn" class="primary-btn" disabled>Start Level</button>
+    </div>
+
+    <div id="quiz-view" class="hidden">
+      <div class="quiz-hud">
+        <div class="hud-item">
+          <span class="hud-label">Level</span>
+          <span id="hud-level" class="hud-value">-</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Time</span>
+          <span id="hud-timer" class="hud-value">0:00</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Score</span>
+          <span id="hud-score" class="hud-value">0</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Streak</span>
+          <span id="hud-streak" class="hud-value">0</span>
+        </div>
+      </div>
+      <div class="timer-bar-track"><div id="timer-bar" class="timer-bar-fill"></div></div>
+
+      <div class="question-card">
+        <div id="question-text" class="question-text">? × ? = </div>
+        <form id="answer-form">
+          <input id="answer-input" type="number" step="any" inputmode="decimal" autocomplete="off" placeholder="?" />
+        </form>
+        <div id="feedback" class="feedback"></div>
+      </div>
+
+      <button id="quit-btn" class="secondary-btn">Quit</button>
+    </div>
+
+    <div id="results-view" class="hidden">
+      <h2 id="results-title">Time's up!</h2>
+      <div class="results-summary">
+        <div class="result-stat"><span id="result-correct">0</span><label>Correct</label></div>
+        <div class="result-stat"><span id="result-total">0</span><label>Attempted</label></div>
+        <div class="result-stat"><span id="result-accuracy">0%</span><label>Accuracy</label></div>
+        <div class="result-stat"><span id="result-best-streak">0</span><label>Best Streak</label></div>
+      </div>
+      <div id="result-stars" class="stars-display"></div>
+      <p id="result-message"></p>
+      <div class="results-actions">
+        <button id="retry-btn" class="primary-btn">Retry</button>
+        <button id="back-btn" class="secondary-btn">Back to Levels</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPORT TAB -->
+  <section id="tab-report" class="tab-panel">
+    <h2>Progress Report</h2>
+    <div class="report-overview" id="report-overview"></div>
+    <div class="table-scroll">
+      <table id="report-table">
+        <thead>
+          <tr id="report-head-row"><th>Level</th></tr>
+        </thead>
+        <tbody id="report-body"></tbody>
+      </table>
+    </div>
+    <button id="reset-progress-btn" class="secondary-btn danger">Reset All Progress</button>
+  </section>
+</main>
+
+<footer class="app-footer">
+  <p>Levels adapted from the original multiplication tables workbook. Progress is saved in your browser.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
