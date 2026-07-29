@@ -111,6 +111,8 @@
   const hudStreak = $("#hud-streak");
   const timerBar = $("#timer-bar");
   const cheatBanner = $("#cheat-banner");
+  const finishBtn = $("#finish-btn");
+  const finishWarning = $("#finish-warning");
   const tableHint = $("#table-hint");
   const bigPictureControl = $("#big-picture-control");
   const bigPictureToggle = $("#big-picture-toggle");
@@ -319,6 +321,7 @@
       const key = `${rows[cell.ri]}x${cols[cell.ci]}`;
       if (saved.has(key)) document.getElementById(cell.id).value = saved.get(key);
     });
+    finishWarning.classList.add("hidden");
     updateBlanksLeftHud();
     const firstEmpty = session.cells.find((c) => document.getElementById(c.id).value === "");
     if (firstEmpty) document.getElementById(firstEmpty.id).focus();
@@ -370,6 +373,8 @@
     hudStreakLabel.textContent = "To do";
     hudScore.textContent = String(session.cells.length);
     hudStreak.textContent = String(session.cells.length);
+    finishWarning.classList.add("hidden");
+    finishBtn.classList.remove("ready");
     const first = document.getElementById(session.cells[0].id);
     if (first) first.focus();
 
@@ -418,15 +423,18 @@
     input.blur();
   }
 
-  function blanksRemaining() {
-    return session.cells.filter((c) => {
-      const el = document.getElementById(c.id);
-      return !el || el.value === "";
-    }).length;
+  function emptyCells() {
+    return session.cells
+      .map((c) => document.getElementById(c.id))
+      .filter((el) => el && el.value === "");
   }
 
   function updateBlanksLeftHud() {
-    hudScore.textContent = String(blanksRemaining());
+    if (!session) return;
+    const left = emptyCells().length;
+    hudScore.textContent = String(left);
+    // Nudge towards Finish once nothing is left blank.
+    finishBtn.classList.toggle("ready", left === 0);
   }
 
   tableContainer.addEventListener("keydown", (e) => {
@@ -437,11 +445,37 @@
       if (input.disabled || input.value === "") return;
       moveToNearbyEmptyCell(input);
       updateBlanksLeftHud();
-      if (blanksRemaining() === 0) finishEarly();
     } else if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
       moveWithArrow(input, e.key);
     }
+  });
+
+  // Typing anywhere refreshes the count and clears any "you missed this"
+  // marker on that cell.
+  tableContainer.addEventListener("input", (e) => {
+    const input = e.target.closest("input.cell-input");
+    if (!input || !session) return;
+    input.classList.remove("cell-missing");
+    if (!tableContainer.querySelector(".cell-missing")) finishWarning.classList.add("hidden");
+    updateBlanksLeftHud();
+  });
+
+  // Finish only submits a complete table — otherwise it points out what's
+  // still empty and sends them back to the first one.
+  finishBtn.addEventListener("click", () => {
+    if (!session) return;
+    const empties = emptyCells();
+    if (empties.length === 0) {
+      finishWarning.classList.add("hidden");
+      finishEarly();
+      return;
+    }
+    empties.forEach((el) => el.classList.add("cell-missing"));
+    finishWarning.textContent = `Still ${empties.length} to go — fill in the highlighted cell${empties.length === 1 ? "" : "s"} before finishing.`;
+    finishWarning.classList.remove("hidden");
+    empties[0].scrollIntoView({ block: "center", behavior: "smooth" });
+    empties[0].focus();
   });
 
   // ---------- Anti-cheat: leaving the tab/window/fullscreen pauses and blanks the level ----------
