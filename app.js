@@ -78,12 +78,23 @@
     return 0;
   }
 
+  // A timer mode counts as "beaten" once accuracy is solid and a real
+  // number of questions were attempted (stops a single lucky guess from
+  // ticking a level off).
+  const BEAT_ACCURACY = 80;
+  const BEAT_MIN_CORRECT = 5;
+  function isBeaten(correct, accuracy) {
+    return correct >= BEAT_MIN_CORRECT && accuracy >= BEAT_ACCURACY;
+  }
+
   // ---------- State ----------
   let progress = loadProgress();
   let selectedLevel = null;
   let selectedMode = TIMER_MODES[1]; // default 1:30
   let session = null; // active quiz session
   let timerHandle = null;
+  let restartingAfterLeave = false;
+  let bannerTimeout = null;
 
   // ---------- DOM refs ----------
   const $ = (sel) => document.querySelector(sel);
@@ -103,6 +114,7 @@
   const questionText = $("#question-text");
   const answerInput = $("#answer-input");
   const feedback = $("#feedback");
+  const cheatBanner = $("#cheat-banner");
 
   // ---------- Tabs ----------
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -124,10 +136,16 @@
       card.type = "button";
       if (selectedLevel && selectedLevel.id === lvl.id) card.classList.add("selected");
       const bestStars = bestStarsAcrossModes(lvl.id);
+      const ticks = TIMER_MODES.map((m) => {
+        const rec = progress[progressKey(lvl.id, m.id)];
+        const beaten = !!rec?.beaten;
+        return `<span class="mode-tick ${beaten ? "beaten" : ""}" title="${m.label}${beaten ? " — beaten" : ""}">${beaten ? "✓" : "·"}</span>`;
+      }).join("");
       card.innerHTML = `
         <div class="level-code">Level ${lvl.id}</div>
         <div class="level-name">${lvl.name}</div>
         <div class="level-stars">${bestStars > 0 ? "★".repeat(bestStars) + "☆".repeat(3 - bestStars) : ""}</div>
+        <div class="level-ticks">${ticks}</div>
       `;
       card.title = lvl.desc;
       card.addEventListener("click", () => {
@@ -180,8 +198,24 @@
     resultsView.classList.toggle("hidden", name !== "results");
   }
 
-  function startSession() {
+  function requestFullscreenSafe() {
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) {
+      try { req.call(el).catch(() => {}); } catch (e) { /* ignore: needs a user gesture */ }
+    }
+  }
+
+  function exitFullscreenSafe() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      if (exit) { try { exit.call(document).catch(() => {}); } catch (e) { /* ignore */ } }
+    }
+  }
+
+  function startSession(afterLeave) {
     if (!selectedLevel) return;
+    requestFullscreenSafe();
     session = {
       level: selectedLevel,
       mode: selectedMode,
@@ -198,12 +232,44 @@
     timerBar.style.width = "100%";
     timerBar.style.background = "";
     showView("quiz");
+    if (afterLeave) {
+      cheatBanner.classList.remove("hidden");
+      clearTimeout(bannerTimeout);
+      bannerTimeout = setTimeout(() => cheatBanner.classList.add("hidden"), 4000);
+    } else {
+      cheatBanner.classList.add("hidden");
+    }
     nextQuestion();
     answerInput.value = "";
     answerInput.focus();
     tick(); // immediate render
     timerHandle = setInterval(tick, 1000);
   }
+
+  // ---------- Anti-cheat: leaving the tab/window/fullscreen resets the level ----------
+  function handlePotentialCheat() {
+    if (!session || restartingAfterLeave) return;
+    restartingAfterLeave = true;
+    const lvl = session.level;
+    const mode = session.mode;
+    clearInterval(timerHandle);
+    timerHandle = null;
+    session = null;
+    selectedLevel = lvl;
+    selectedMode = mode;
+    setTimeout(() => {
+      restartingAfterLeave = false;
+      startSession(true);
+    }, 30);
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) handlePotentialCheat();
+  });
+  window.addEventListener("blur", handlePotentialCheat);
+  document.addEventListener("fullscreenchange", () => {
+    if (!document.fullscreenElement && session) handlePotentialCheat();
+  });
 
   function tick() {
     hudTimer.textContent = formatTime(session.remaining);
@@ -269,6 +335,7 @@
 
     const accuracy = session.attempted > 0 ? Math.round((session.correct / session.attempted) * 100) : 0;
     const stars = starsFor(session.correct, accuracy);
+    const beaten = isBeaten(session.correct, accuracy);
 
     if (!quit) {
       const key = progressKey(session.level.id, session.mode.id);
@@ -280,30 +347,36 @@
         attempted: session.attempted,
         accuracy,
         stars,
+        beaten: beaten || !!prior?.beaten,
         bestStreak: session.bestStreak,
         attempts: (prior?.attempts || 0) + 1,
         lastPlayed: new Date().toISOString(),
       };
       if (!prior || betterThan(record, prior)) {
+        record.beaten = beaten || !!prior?.beaten;
         progress[key] = record;
       } else {
         prior.attempts += 1;
         prior.lastPlayed = record.lastPlayed;
+        prior.beaten = prior.beaten || beaten;
         progress[key] = prior;
       }
       saveProgress(progress);
 
-      $("#results-title").textContent = "Time's up!";
+      $("#results-title").textContent = beaten ? "Level beaten! 🎉" : "Time's up!";
       $("#result-correct").textContent = session.correct;
       $("#result-total").textContent = session.attempted;
       $("#result-accuracy").textContent = accuracy + "%";
       $("#result-best-streak").textContent = session.bestStreak;
       $("#result-stars").textContent = "★".repeat(stars) + "☆".repeat(3 - stars);
-      $("#result-message").textContent = messageFor(stars);
+      $("#result-message").textContent = beaten
+        ? `You beat ${session.level.id} at ${session.mode.label} — that mode is now ticked off in your Report.`
+        : messageFor(stars);
       showView("results");
     } else {
       showView("select");
     }
+    exitFullscreenSafe();
     session = null;
     renderLevelGrid();
   }
@@ -331,6 +404,7 @@
     const records = Object.values(progress);
     const levelsStarted = new Set(records.map((r) => r.levelId)).size;
     const totalStars = LEVELS.reduce((sum, lvl) => sum + bestStarsAcrossModes(lvl.id), 0);
+    const totalBeaten = records.filter((r) => r.beaten).length;
     const totalAttempts = records.reduce((s, r) => s + (r.attempts || 0), 0);
     const avgAccuracy = records.length
       ? Math.round(records.reduce((s, r) => s + r.accuracy, 0) / records.length)
@@ -338,6 +412,7 @@
 
     overview.innerHTML = `
       <div class="overview-card"><span>${levelsStarted}/${LEVELS.length}</span><label>Levels started</label></div>
+      <div class="overview-card"><span>${totalBeaten}/${LEVELS.length * TIMER_MODES.length}</span><label>Timers beaten ✓</label></div>
       <div class="overview-card"><span>${totalStars}/${LEVELS.length * 3}</span><label>Total stars</label></div>
       <div class="overview-card"><span>${totalAttempts}</span><label>Attempts logged</label></div>
       <div class="overview-card"><span>${avgAccuracy}%</span><label>Avg accuracy</label></div>
@@ -353,7 +428,8 @@
       TIMER_MODES.forEach((mode) => {
         const rec = progress[progressKey(lvl.id, mode.id)];
         if (rec) {
-          html += `<td><span class="cell-stars">${"★".repeat(rec.stars)}${"☆".repeat(3 - rec.stars)}</span><br><small>${rec.correct}/${rec.attempted} · ${rec.accuracy}%</small></td>`;
+          const badge = rec.beaten ? '<span class="cell-beaten" title="Beaten">✓</span> ' : "";
+          html += `<td>${badge}<span class="cell-stars">${"★".repeat(rec.stars)}${"☆".repeat(3 - rec.stars)}</span><br><small>${rec.correct}/${rec.attempted} · ${rec.accuracy}%</small></td>`;
         } else {
           html += `<td class="cell-empty">—</td>`;
         }

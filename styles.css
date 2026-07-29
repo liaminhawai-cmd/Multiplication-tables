@@ -304,6 +304,46 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 .cell-stars { color: #fbbf24; }
 .cell-empty { color: #475569; }
 
+.level-ticks {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.mode-tick {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #475569;
+  background: #0b1120;
+  border-radius: 999px;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mode-tick.beaten {
+  color: #0f172a;
+  background: var(--good);
+}
+
+.cell-beaten {
+  color: var(--good);
+  font-weight: 800;
+}
+
+.cheat-banner {
+  background: #7f1d1d;
+  color: #fecaca;
+  border: 1px solid var(--bad);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
 .app-footer {
   text-align: center;
   color: var(--muted);
