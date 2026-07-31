@@ -40,9 +40,9 @@
   ];
 
   const TIMER_MODES = [
-    { id: "90", label: "1:30", seconds: 90 },
+    { id: "60", label: "1:00", seconds: 60 },
     { id: "45", label: "0:45", seconds: 45 },
-    { id: "20", label: "0:20", seconds: 20 },
+    { id: "30", label: "0:30", seconds: 30 },
   ];
 
   // Untimed levels get a single "Practice" slot instead of the timer tiers.
@@ -92,7 +92,7 @@
   // ---------- State ----------
   let progress = loadProgress();
   let selectedLevel = null;
-  let selectedMode = TIMER_MODES[0]; // default 1:30
+  let selectedMode = TIMER_MODES[0]; // default 1:00
   let session = null; // active quiz session
   let timerHandle = null;
   let bannerTimeout = null;
