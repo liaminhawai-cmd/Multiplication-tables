@@ -578,15 +578,33 @@
       const el = document.getElementById(c.id);
       if (!el) return;
       const answer = parseFloat(el.dataset.answer);
-      const given = parseFloat(el.value);
-      const isCorrect = el.value !== "" && Math.abs(given - answer) < 0.001;
-      if (isCorrect) {
-        correct += 1;
-      } else {
-        el.value = el.dataset.answer; // reveal the right number where they were wrong or left it blank
+      const given = el.value;
+      const isCorrect = given !== "" && Math.abs(parseFloat(given) - answer) < 0.001;
+      if (isCorrect) correct += 1;
+
+      // Swap the input for static markup. On a miss show the right answer AND
+      // what they actually put, so a red cell can't be misread as "this number
+      // is wrong" when it's the correct one being revealed.
+      const result = document.createElement("div");
+      result.className = "cell-result";
+
+      const answerEl = document.createElement("span");
+      answerEl.className = "cell-answer";
+      answerEl.textContent = el.dataset.answer;
+      result.appendChild(answerEl);
+
+      if (!isCorrect) {
+        const yours = document.createElement("span");
+        yours.className = "cell-yours";
+        yours.textContent = given === "" ? "you: —" : `you: ${given}`;
+        result.appendChild(yours);
       }
-      el.disabled = true;
-      el.classList.add(isCorrect ? "cell-correct" : "cell-wrong");
+
+      const td = el.closest("td");
+      td.innerHTML = "";
+      td.appendChild(result);
+      td.classList.remove("cell-data");
+      td.classList.add(isCorrect ? "cell-correct" : "cell-wrong");
     });
     return { correct, attempted: session.cells.length };
   }

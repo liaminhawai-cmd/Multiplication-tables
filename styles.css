@@ -451,21 +451,24 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 }
 .cell-input[type="number"] { -moz-appearance: textfield; }
 
-.cell-input:disabled {
-  opacity: 1;
-  -webkit-text-fill-color: currentColor;
+/* Result reveal: replaces the input once graded. On a miss, show the
+   correct answer plus what was actually typed, so a red cell never reads
+   as "this number is wrong" when it's the right answer being shown. */
+.cell-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+  gap: 2px;
 }
 
-.cell-input.cell-correct {
-  background: rgba(74, 222, 128, 0.22);
-  color: var(--good);
-  font-weight: 700;
-}
+.cell-answer { font-weight: 700; }
 
-.cell-input.cell-wrong {
-  background: rgba(248, 113, 113, 0.22);
-  color: var(--bad);
-  font-weight: 700;
+.cell-yours {
+  font-size: 0.7em;
+  font-weight: 600;
+  opacity: 0.85;
 }
 
 .table-container {
