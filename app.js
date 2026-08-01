@@ -10,6 +10,33 @@
   const DECIMAL_AXIS = [0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2];
   const between = (v, lo, hi) => v >= lo - 1e-9 && v <= hi + 1e-9;
 
+  // ---------- Fraction axes ----------
+  // Every multiple of 1/d up to `cap`, reduced to lowest terms and deduped
+  // across denominators (so 2/2 and 1 collapse to the same point). Sorted by
+  // value — the resulting axis is only evenly spaced for a single
+  // denominator; combining denominators is exactly what makes the gaps
+  // "wonky", which the proportional grid layout then shows visually.
+  function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+  function buildFractionAxis(denominators, cap) {
+    const points = new Map(); // value -> label
+    denominators.forEach((d) => {
+      for (let k = 1; k <= cap * d; k++) {
+        const g = gcd(k, d);
+        const n = k / g, rd = d / g;
+        const value = n / rd;
+        if (!points.has(value)) points.set(value, rd === 1 ? String(n) : `${n}/${rd}`);
+      }
+    });
+    const axis = Array.from(points.keys()).sort((a, b) => a - b);
+    return { axis, labels: points };
+  }
+
+  const FRACTIONS_HALVES = buildFractionAxis([2], 3);
+  const FRACTIONS_THIRDS = buildFractionAxis([3], 2);
+  const FRACTIONS_HALVES_THIRDS = buildFractionAxis([2, 3], 2);
+  const FRACTIONS_FOURTHS = buildFractionAxis([4], 2);
+  const FRACTIONS_FIFTHS = buildFractionAxis([5], 2);
+
   const LEVELS = [
     { id: "A", name: "1–5 × 1–5", desc: "Small numbers warm-up", domain: "int",
       axis: range(1, 12), target: (r, c) => r <= 5 && c <= 5 },
@@ -41,6 +68,16 @@
       domain: "int", dynamic: true, axis: [], target: () => false },
     { id: "PZ_DEC", name: "My Weak Spots (Decimals)", desc: "Personalized — your most-missed decimal facts",
       domain: "decimal", dynamic: true, axis: DECIMAL_AXIS, target: () => false },
+    { id: "FR_HALVES", name: "Halves to 3", desc: "Fractions: ½ steps up to 3", domain: "fraction",
+      proportional: true, axis: FRACTIONS_HALVES.axis, fractionLabels: FRACTIONS_HALVES.labels, target: () => true },
+    { id: "FR_THIRDS", name: "Thirds to 2", desc: "Fractions: ⅓ steps up to 2", domain: "fraction",
+      proportional: true, prereq: "FR_HALVES", axis: FRACTIONS_THIRDS.axis, fractionLabels: FRACTIONS_THIRDS.labels, target: () => true },
+    { id: "FR_HALVES_THIRDS", name: "Halves & Thirds to 2", desc: "Fractions: ½s and ⅓s combined", domain: "fraction",
+      proportional: true, prereq: "FR_THIRDS", axis: FRACTIONS_HALVES_THIRDS.axis, fractionLabels: FRACTIONS_HALVES_THIRDS.labels, target: () => true },
+    { id: "FR_FOURTHS", name: "Fourths to 2", desc: "Fractions: ¼ steps up to 2", domain: "fraction",
+      proportional: true, prereq: "FR_HALVES_THIRDS", axis: FRACTIONS_FOURTHS.axis, fractionLabels: FRACTIONS_FOURTHS.labels, target: () => true },
+    { id: "FR_FIFTHS", name: "Fifths to 2", desc: "Fractions: ⅕ steps up to 2", domain: "fraction",
+      proportional: true, prereq: "FR_FOURTHS", axis: FRACTIONS_FIFTHS.axis, fractionLabels: FRACTIONS_FIFTHS.labels, target: () => true },
   ];
 
   const TIMER_MODES = [
@@ -231,13 +268,32 @@
   });
 
   // ---------- Level select rendering ----------
+  function isLevelBeaten(levelId) {
+    return Object.values(progress).some((r) => r.levelId === levelId && r.beaten);
+  }
+
   function renderLevelGrid() {
     levelGrid.innerHTML = "";
     LEVELS.forEach((lvl) => {
+      const locked = lvl.prereq && !isLevelBeaten(lvl.prereq);
       const card = document.createElement("button");
-      card.className = "level-card";
+      card.className = "level-card" + (locked ? " locked" : "");
       card.type = "button";
+      card.disabled = locked;
       if (selectedLevel && selectedLevel.id === lvl.id) card.classList.add("selected");
+
+      if (locked) {
+        const prereqName = LEVELS.find((l) => l.id === lvl.prereq)?.name || lvl.prereq;
+        card.innerHTML = `
+          <div class="level-code">🔒 Locked</div>
+          <div class="level-name">${lvl.name}</div>
+          <div class="level-lock-hint">Beat "${prereqName}" to unlock</div>
+        `;
+        card.title = `Beat ${prereqName} first`;
+        levelGrid.appendChild(card);
+        return;
+      }
+
       const bestStars = bestStarsAcrossModes(lvl.id);
       const ticks = modesFor(lvl).map((m) => {
         const rec = progress[progressKey(lvl.id, m.id)];
@@ -336,7 +392,10 @@
   // ghost text you type over; the rest are plain reference cells showing their
   // question too, so the sheet reads the same but only the task is editable.
   function cellId(ri, ci) { return `cell-${ri}-${ci}`; }
-  function fmt(n) { return String(round2(n)); }
+  function fmt(n, level) {
+    const label = level?.fractionLabels?.get(n);
+    return label ?? String(round2(n));
+  }
 
   // Big Picture mode drops rows/columns that contain no target cells, so a
   // level like "1-5 x 1-5" collapses from the full 12x12 down to just its block.
@@ -348,18 +407,57 @@
     };
   }
 
+  // Turns a sorted list of numeric positions into proportional shares (%) of
+  // a line, using the midpoint between neighbors as each point's boundary —
+  // so points close together get a thin share and points far apart get a
+  // wide one. Only visibly "wonky" when the axis mixes step sizes (e.g.
+  // combined halves+thirds); a single-denominator axis is evenly spaced
+  // anyway and comes out uniform here too.
+  function proportionalShares(values) {
+    const n = values.length;
+    if (n === 1) return [100];
+    const bounds = [values[0] - (values[1] - values[0]) / 2];
+    for (let i = 0; i < n - 1; i++) bounds.push((values[i] + values[i + 1]) / 2);
+    bounds.push(values[n - 1] + (values[n - 1] - values[n - 2]) / 2);
+    const widths = [];
+    for (let i = 0; i < n; i++) widths.push(bounds[i + 1] - bounds[i]);
+    const total = widths.reduce((a, b) => a + b, 0);
+    return widths.map((w) => (w / total) * 100);
+  }
+
   function buildGridTable(level, axisRows, axisCols, targetCells) {
     const table = document.createElement("table");
-    table.className = "excel-table";
-    const headRow = axisCols.map((c) => `<th>${fmt(c)}</th>`).join("");
+    table.className = "excel-table" + (level.proportional ? " proportional" : "");
+    const headRow = axisCols.map((c) => `<th>${fmt(c, level)}</th>`).join("");
     table.innerHTML = `<thead><tr><th class="corner">×</th>${headRow}</tr></thead>`;
+
+    if (level.proportional) {
+      const labelShare = 10;
+      const colShares = proportionalShares(axisCols).map((s) => (s / 100) * (100 - labelShare));
+      const colgroup = document.createElement("colgroup");
+      const labelCol = document.createElement("col");
+      labelCol.style.width = `${labelShare}%`;
+      colgroup.appendChild(labelCol);
+      colShares.forEach((s) => {
+        const col = document.createElement("col");
+        col.style.width = `${s}%`;
+        colgroup.appendChild(col);
+      });
+      table.insertBefore(colgroup, table.firstChild);
+    }
+
+    const rowHeights = level.proportional
+      ? proportionalShares(axisRows).map((s) => Math.max(30, (s / 100) * axisRows.length * 46))
+      : null;
+
     const tbody = document.createElement("tbody");
     axisRows.forEach((r, ri) => {
       const tr = document.createElement("tr");
-      tr.appendChild(document.createElement("th")).textContent = fmt(r);
+      if (rowHeights) tr.style.height = `${rowHeights[ri]}px`;
+      tr.appendChild(document.createElement("th")).textContent = fmt(r, level);
       axisCols.forEach((c, ci) => {
         const td = document.createElement("td");
-        const question = `${fmt(r)} × ${fmt(c)}`;
+        const question = `${fmt(r, level)} × ${fmt(c, level)}`;
         if (level.target(r, c)) {
           td.className = "cell-data";
           td.appendChild(buildCellInput(ri, ci, round2(r * c), question, r, c));

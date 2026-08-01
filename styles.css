@@ -147,6 +147,21 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
   min-height: 1.1em;
 }
 
+.level-card.locked {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.level-card.locked:hover { transform: none; }
+
+.level-card.locked .level-code { color: var(--muted); }
+
+.level-lock-hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
 .timer-select {
   display: flex;
   gap: 10px;
