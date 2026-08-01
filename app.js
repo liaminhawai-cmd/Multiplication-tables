@@ -11,32 +11,36 @@
   const between = (v, lo, hi) => v >= lo - 1e-9 && v <= hi + 1e-9;
 
   const LEVELS = [
-    { id: "A", name: "1–5 × 1–5", desc: "Small numbers warm-up",
+    { id: "A", name: "1–5 × 1–5", desc: "Small numbers warm-up", domain: "int",
       axis: range(1, 12), target: (r, c) => r <= 5 && c <= 5 },
-    { id: "B", name: "Evens", desc: "Even times tables",
+    { id: "B", name: "Evens", desc: "Even times tables", domain: "int",
       axis: range(1, 12), target: (r, c) => r % 2 === 0 && c % 2 === 0 },
-    { id: "C", name: "6–9 × 3–5", desc: "Mid-range mix",
+    { id: "C", name: "6–9 × 3–5", desc: "Mid-range mix", domain: "int",
       axis: range(1, 12), target: (r, c) => between(r, 6, 9) && between(c, 3, 5) },
-    { id: "D", name: "7s and 9s", desc: "Focus on the 7 and 9 tables",
+    { id: "D", name: "7s and 9s", desc: "Focus on the 7 and 9 tables", domain: "int",
       axis: range(1, 12), target: (r, c) => r === 7 || r === 9 || c === 7 || c === 9 },
-    { id: "E", name: "6–10 × 6–10", desc: "Higher numbers",
+    { id: "E", name: "6–10 × 6–10", desc: "Higher numbers", domain: "int",
       axis: range(1, 12), target: (r, c) => between(r, 6, 10) && between(c, 6, 10) },
-    { id: "F", name: "Odd × Odd", desc: "Odd numbers only",
+    { id: "F", name: "Odd × Odd", desc: "Odd numbers only", domain: "int",
       axis: range(1, 12), target: (r, c) => r % 2 !== 0 && c % 2 !== 0 },
-    { id: "G", name: "Squares to 15", desc: "n × n up to 15",
+    { id: "G", name: "Squares to 15", desc: "n × n up to 15", domain: "int",
       axis: range(1, 15), target: (r, c) => r === c },
-    { id: "FULL", name: "Full 12×12", desc: "Free practice — no timer", untimed: true,
+    { id: "FULL", name: "Full 12×12", desc: "Free practice — no timer", untimed: true, domain: "int",
       axis: range(1, 12), target: () => true },
-    { id: "H", name: "Squares to 25", desc: "Extension: n × n from 11 to 25",
+    { id: "H", name: "Squares to 25", desc: "Extension: n × n from 11 to 25", domain: "int",
       axis: range(11, 25), target: (r, c) => r === c },
-    { id: "I", name: "Squares to 30", desc: "Extension: n × n from 16 to 30",
+    { id: "I", name: "Squares to 30", desc: "Extension: n × n from 16 to 30", domain: "int",
       axis: range(16, 30), target: (r, c) => r === c },
-    { id: "J", name: "Decimals (all)", desc: "Every decimal pair 0.2–2",
+    { id: "J", name: "Decimals (all)", desc: "Every decimal pair 0.2–2", domain: "decimal",
       axis: DECIMAL_AXIS, target: () => true },
-    { id: "K", name: "Decimals 0.2–1", desc: "Smaller decimal pairs",
+    { id: "K", name: "Decimals 0.2–1", desc: "Smaller decimal pairs", domain: "decimal",
       axis: DECIMAL_AXIS, target: (r, c) => between(r, 0.2, 1) && between(c, 0.2, 1) },
-    { id: "L", name: "Decimals 0.6–1.4", desc: "Middle decimal pairs",
+    { id: "L", name: "Decimals 0.6–1.4", desc: "Middle decimal pairs", domain: "decimal",
       axis: DECIMAL_AXIS, target: (r, c) => between(r, 0.6, 1.4) && between(c, 0.6, 1.4) },
+    { id: "PZ_INT", name: "My Weak Spots", desc: "Personalized — your most-missed times tables",
+      domain: "int", dynamic: true, axis: [], target: () => false },
+    { id: "PZ_DEC", name: "My Weak Spots (Decimals)", desc: "Personalized — your most-missed decimal facts",
+      domain: "decimal", dynamic: true, axis: DECIMAL_AXIS, target: () => false },
   ];
 
   const TIMER_MODES = [
@@ -57,6 +61,14 @@
     return out;
   }
   function round2(n) { return Math.round(n * 100) / 100; }
+  function shuffle(arr) {
+    const out = arr.slice();
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
 
   // ---------- Progress storage ----------
   const STORAGE_KEY = "multab_progress_v1";
@@ -73,6 +85,73 @@
   }
   function progressKey(levelId, modeId) { return `${levelId}__${modeId}`; }
 
+  // ---------- Fact-level tracking (feeds "My Weak Spots") ----------
+  // Every graded cell across every level (not just the personalized ones)
+  // updates this, keyed per domain so integer and decimal misses never mix.
+  const FACT_STATS_KEY = "multab_fact_stats_v1";
+  let factStats = loadFactStats();
+
+  function loadFactStats() {
+    try {
+      return JSON.parse(localStorage.getItem(FACT_STATS_KEY)) || {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function saveFactStats() {
+    localStorage.setItem(FACT_STATS_KEY, JSON.stringify(factStats));
+  }
+  function factKey(a, b) {
+    return a <= b ? `${a},${b}` : `${b},${a}`;
+  }
+  function recordFactResult(domain, r, c, correct) {
+    if (!domain) return;
+    const bucket = factStats[domain] || (factStats[domain] = {});
+    const key = factKey(r, c);
+    const entry = bucket[key] || (bucket[key] = { wrong: 0, right: 0, lastWrongAt: null });
+    if (correct) entry.right += 1;
+    else { entry.wrong += 1; entry.lastWrongAt = Date.now(); }
+  }
+
+  // Picks 15–25 facts to drill: recently-missed facts first (most recent
+  // miss wins ties), falling back to unseen facts from a modest range if
+  // there isn't enough miss history yet to fill the set.
+  function pickWeakFacts(domain) {
+    const bucket = factStats[domain] || {};
+    const missed = Object.keys(bucket)
+      .map((key) => {
+        const [a, b] = key.split(",").map(Number);
+        return { a, b, ...bucket[key] };
+      })
+      .filter((f) => f.wrong > 0)
+      .sort((x, y) => (y.lastWrongAt || 0) - (x.lastWrongAt || 0) || y.wrong - x.wrong);
+
+    const picked = missed.slice(0, 25);
+    if (picked.length < 15) {
+      const pool = domain === "decimal" ? DECIMAL_AXIS : range(1, 12);
+      const seen = new Set(picked.map((p) => factKey(p.a, p.b)));
+      const candidates = shuffle(pool.flatMap((a) => pool.filter((b) => b >= a).map((b) => ({ a, b }))));
+      for (const cand of candidates) {
+        const key = factKey(cand.a, cand.b);
+        if (seen.has(key)) continue;
+        picked.push(cand);
+        seen.add(key);
+        if (picked.length >= 15) break;
+      }
+    }
+    return picked;
+  }
+
+  // Personalized levels have no fixed axis/target — rebuild them from the
+  // current weakest-facts pick right before each attempt starts.
+  function refreshDynamicLevel(level) {
+    const picked = pickWeakFacts(level.domain);
+    const axisSet = new Set();
+    picked.forEach((p) => { axisSet.add(p.a); axisSet.add(p.b); });
+    level.axis = Array.from(axisSet).sort((a, b) => a - b);
+    level.target = (r, c) => picked.some((p) => (p.a === r && p.b === c) || (p.a === c && p.b === r));
+  }
+
   function starsFor(correct, accuracy) {
     if (correct >= 10 && accuracy >= 90) return 3;
     if (correct >= 6 && accuracy >= 75) return 2;
@@ -80,10 +159,10 @@
     return 0;
   }
 
-  // A timer mode counts as "beaten" once accuracy is solid and a real
-  // number of questions were attempted (stops a single lucky guess from
-  // ticking a level off).
-  const BEAT_ACCURACY = 80;
+  // A timer mode counts as "beaten" only on a perfect run (every target
+  // cell correct) with a real number of questions attempted — no partial
+  // credit, so a tick actually means they've got it.
+  const BEAT_ACCURACY = 100;
   const BEAT_MIN_CORRECT = 5;
   function isBeaten(correct, accuracy) {
     return correct >= BEAT_MIN_CORRECT && accuracy >= BEAT_ACCURACY;
@@ -283,7 +362,7 @@
         const question = `${fmt(r)} × ${fmt(c)}`;
         if (level.target(r, c)) {
           td.className = "cell-data";
-          td.appendChild(buildCellInput(ri, ci, round2(r * c), question));
+          td.appendChild(buildCellInput(ri, ci, round2(r * c), question, r, c));
           targetCells.push({ id: cellId(ri, ci), ri, ci });
         } else {
           td.className = "cell-ref";
@@ -297,7 +376,7 @@
     return table;
   }
 
-  function buildCellInput(ri, ci, answer, question) {
+  function buildCellInput(ri, ci, answer, question, r, c) {
     const input = document.createElement("input");
     input.type = "number";
     input.step = "any";
@@ -309,6 +388,8 @@
     input.dataset.ci = ci;
     input.dataset.answer = answer;
     input.dataset.question = question;
+    input.dataset.factR = r;
+    input.dataset.factC = c;
     input.placeholder = question; // the QUESTION, faint — typing writes over it
     return input;
   }
@@ -357,6 +438,7 @@
     pendingAdvanceTimeout = null;
     requestFullscreenSafe();
     const level = selectedLevel;
+    if (level.dynamic) refreshDynamicLevel(level);
     const mode = level.untimed ? FREE_MODE : selectedMode;
     const { rows, cols } = visibleAxes(level);
     session = {
@@ -581,6 +663,7 @@
       const given = el.value;
       const isCorrect = given !== "" && Math.abs(parseFloat(given) - answer) < 0.001;
       if (isCorrect) correct += 1;
+      recordFactResult(session.level.domain, Number(el.dataset.factR), Number(el.dataset.factC), isCorrect);
 
       // Swap the input for static markup. On a miss show the right answer AND
       // what they actually put, so a red cell can't be misread as "this number
@@ -606,6 +689,7 @@
       td.classList.remove("cell-data");
       td.classList.add(isCorrect ? "cell-correct" : "cell-wrong");
     });
+    saveFactStats();
     return { correct, attempted: session.cells.length };
   }
 
