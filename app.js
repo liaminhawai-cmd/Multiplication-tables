@@ -40,6 +40,42 @@
   const FRACTIONS_FOURTHS = buildFractionAxis([4], 2);
   const FRACTIONS_FIFTHS = buildFractionAxis([5], 2);
 
+  // Fraction cells need two typed fields (numerator + denominator) where a
+  // normal times-tables cell only needs one, so making every cell a target
+  // is roughly double the typing of any other level for the same grid size.
+  // These pick a fixed-looking-random subset instead, sized so the total
+  // number of fields to fill lines up with the other levels (most sit in
+  // the 12-44 single-field range) — every row and column still gets at
+  // least one target so Big Picture mode never has to drop one entirely.
+  function hash01(a, b) {
+    const x = Math.sin(a * 12.9898 + b * 78.233 + 1) * 43758.5453;
+    return x - Math.floor(x);
+  }
+  function pickTargetIndices(size, count) {
+    const chosen = new Set();
+    const key = (ri, ci) => ri * 1000 + ci;
+    for (let ri = 0; ri < size; ri++) chosen.add(key(ri, Math.floor(hash01(ri, 91) * size)));
+    for (let ci = 0; ci < size; ci++) {
+      let covered = false;
+      chosen.forEach((k) => { if (k % 1000 === ci) covered = true; });
+      if (!covered) chosen.add(key(Math.floor(hash01(ci, 173) * size), ci));
+    }
+    const all = [];
+    for (let ri = 0; ri < size; ri++) {
+      for (let ci = 0; ci < size; ci++) all.push({ ri, ci, h: hash01(ri * 31 + ci, 777) });
+    }
+    all.sort((a, b) => a.h - b.h);
+    for (const { ri, ci } of all) {
+      if (chosen.size >= count) break;
+      chosen.add(key(ri, ci));
+    }
+    return (ri, ci) => chosen.has(key(ri, ci));
+  }
+  function sparseFractionTarget(axis, count) {
+    const pick = pickTargetIndices(axis.length, count);
+    return (r, c) => pick(axis.indexOf(r), axis.indexOf(c));
+  }
+
   // Level select groups levels by `category`:
   //  "core"       — Times Tables section
   //  "playground" — the untimed reference chart, shown as its own banner
@@ -79,15 +115,15 @@
     { id: "PZ_DEC", name: "My Weak Spots (Decimals)", desc: "Personalized — your most-missed decimal facts",
       domain: "decimal", category: "extension", dynamic: true, axis: DECIMAL_AXIS, target: () => false },
     { id: "FR_HALVES", name: "Halves to 3", desc: "Fractions: ½ steps up to 3", domain: "fraction", category: "extension",
-      proportional: true, axis: FRACTIONS_HALVES.axis, fractionLabels: FRACTIONS_HALVES.labels, fractionParts: FRACTIONS_HALVES.parts, target: () => true },
+      proportional: true, axis: FRACTIONS_HALVES.axis, fractionLabels: FRACTIONS_HALVES.labels, fractionParts: FRACTIONS_HALVES.parts, target: sparseFractionTarget(FRACTIONS_HALVES.axis, 14) },
     { id: "FR_THIRDS", name: "Thirds to 2", desc: "Fractions: ⅓ steps up to 2", domain: "fraction", category: "extension",
-      proportional: true, prereq: "FR_HALVES", axis: FRACTIONS_THIRDS.axis, fractionLabels: FRACTIONS_THIRDS.labels, fractionParts: FRACTIONS_THIRDS.parts, target: () => true },
+      proportional: true, prereq: "FR_HALVES", axis: FRACTIONS_THIRDS.axis, fractionLabels: FRACTIONS_THIRDS.labels, fractionParts: FRACTIONS_THIRDS.parts, target: sparseFractionTarget(FRACTIONS_THIRDS.axis, 14) },
     { id: "FR_HALVES_THIRDS", name: "Halves & Thirds to 2", desc: "Fractions: ½s and ⅓s combined", domain: "fraction", category: "extension",
-      proportional: true, prereq: "FR_THIRDS", axis: FRACTIONS_HALVES_THIRDS.axis, fractionLabels: FRACTIONS_HALVES_THIRDS.labels, fractionParts: FRACTIONS_HALVES_THIRDS.parts, target: () => true },
+      proportional: true, prereq: "FR_THIRDS", axis: FRACTIONS_HALVES_THIRDS.axis, fractionLabels: FRACTIONS_HALVES_THIRDS.labels, fractionParts: FRACTIONS_HALVES_THIRDS.parts, target: sparseFractionTarget(FRACTIONS_HALVES_THIRDS.axis, 18) },
     { id: "FR_FOURTHS", name: "Fourths to 2", desc: "Fractions: ¼ steps up to 2", domain: "fraction", category: "extension",
-      proportional: true, prereq: "FR_HALVES_THIRDS", axis: FRACTIONS_FOURTHS.axis, fractionLabels: FRACTIONS_FOURTHS.labels, fractionParts: FRACTIONS_FOURTHS.parts, target: () => true },
+      proportional: true, prereq: "FR_HALVES_THIRDS", axis: FRACTIONS_FOURTHS.axis, fractionLabels: FRACTIONS_FOURTHS.labels, fractionParts: FRACTIONS_FOURTHS.parts, target: sparseFractionTarget(FRACTIONS_FOURTHS.axis, 18) },
     { id: "FR_FIFTHS", name: "Fifths to 2", desc: "Fractions: ⅕ steps up to 2", domain: "fraction", category: "extension",
-      proportional: true, prereq: "FR_FOURTHS", axis: FRACTIONS_FIFTHS.axis, fractionLabels: FRACTIONS_FIFTHS.labels, fractionParts: FRACTIONS_FIFTHS.parts, target: () => true },
+      proportional: true, prereq: "FR_FOURTHS", axis: FRACTIONS_FIFTHS.axis, fractionLabels: FRACTIONS_FIFTHS.labels, fractionParts: FRACTIONS_FIFTHS.parts, target: sparseFractionTarget(FRACTIONS_FIFTHS.axis, 22) },
   ];
 
   const TIMER_MODES = [
