@@ -622,10 +622,16 @@
     finishSession({ correct, attempted, finishedEarly: true, elapsedSeconds });
   }
 
-  function saveLevelResult(level, mode, correct, attempted, accuracy, beaten) {
+  // timeSeconds is the exact wall-clock time a completed run took — only
+  // passed when the whole table was actually finished, never on a timeout.
+  // The fastest one ever recorded for this level+mode is kept as bestTimeSeconds.
+  function saveLevelResult(level, mode, correct, attempted, accuracy, beaten, timeSeconds) {
     const key = progressKey(level.id, mode.id);
     const prior = progress[key];
     const stars = starsFor(correct, accuracy);
+    const bestTimeSeconds = timeSeconds == null
+      ? prior?.bestTimeSeconds ?? null
+      : prior?.bestTimeSeconds != null ? Math.min(prior.bestTimeSeconds, timeSeconds) : timeSeconds;
     const record = {
       levelId: level.id,
       modeId: mode.id,
@@ -634,6 +640,7 @@
       accuracy,
       stars,
       beaten: beaten || !!prior?.beaten,
+      bestTimeSeconds,
       attempts: (prior?.attempts || 0) + 1,
       lastPlayed: new Date().toISOString(),
     };
@@ -644,6 +651,7 @@
       prior.attempts += 1;
       prior.lastPlayed = record.lastPlayed;
       prior.beaten = prior.beaten || beaten;
+      prior.bestTimeSeconds = bestTimeSeconds;
       progress[key] = prior;
     }
   }
@@ -666,18 +674,21 @@
     const stars = starsFor(correct, accuracy);
     const beatenSelected = isBeaten(correct, accuracy);
 
+    // Only a genuinely completed run has a real "how fast" to record.
+    const timeSeconds = finishedEarly ? elapsedSeconds : null;
+
     // Only timed levels earn tier ticks; free practice just records its own slot.
     const tickedModes = [];
     if (finishedEarly && beatenSelected && !level.untimed) {
       TIMER_MODES.forEach((m) => {
         if (elapsedSeconds <= m.seconds) {
-          saveLevelResult(level, m, correct, attempted, accuracy, true);
+          saveLevelResult(level, m, correct, attempted, accuracy, true, timeSeconds);
           tickedModes.push(m);
         }
       });
     }
     if (!tickedModes.some((m) => m.id === mode.id)) {
-      saveLevelResult(level, mode, correct, attempted, accuracy, beatenSelected);
+      saveLevelResult(level, mode, correct, attempted, accuracy, beatenSelected, timeSeconds);
     }
     saveProgress(progress);
 
@@ -756,7 +767,8 @@
     function resultCell(rec, extraClass) {
       if (!rec) return `<td class="cell-empty${extraClass ? " " + extraClass : ""}">—</td>`;
       const badge = rec.beaten ? '<span class="cell-beaten" title="Beaten">✓</span> ' : "";
-      return `<td${extraClass ? ` class="${extraClass}"` : ""}>${badge}<span class="cell-stars">${"★".repeat(rec.stars)}${"☆".repeat(3 - rec.stars)}</span><br><small>${rec.correct}/${rec.attempted} · ${rec.accuracy}%</small></td>`;
+      const timeLine = rec.bestTimeSeconds != null ? `<br><small class="cell-time">⏱ ${formatTime(rec.bestTimeSeconds)}</small>` : "";
+      return `<td${extraClass ? ` class="${extraClass}"` : ""}>${badge}<span class="cell-stars">${"★".repeat(rec.stars)}${"☆".repeat(3 - rec.stars)}</span><br><small>${rec.correct}/${rec.attempted} · ${rec.accuracy}%</small>${timeLine}</td>`;
     }
 
     body.innerHTML = "";

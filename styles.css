@@ -334,6 +334,7 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 }
 
 .cell-stars { color: #fbbf24; }
+.cell-time { color: var(--accent); }
 .cell-empty { color: #475569; }
 .cell-practice { background: #16213a; }
 
