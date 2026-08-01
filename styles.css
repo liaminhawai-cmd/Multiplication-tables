@@ -114,6 +114,31 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
   margin-bottom: 24px;
 }
 
+.section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: left;
+}
+
+.section-toggle:hover { background: rgba(148, 163, 184, 0.16); }
+
+.section-toggle-count {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
 .playground-grid {
   grid-template-columns: 1fr;
 }
@@ -451,14 +476,6 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 .cell-ref {
   color: #3f5170;
   font-size: 0.8em;
-  background: #0b1120;
-}
-
-/* The browsable reference chart shows the actual product, front and center */
-.cell-ref-answer {
-  color: var(--text);
-  font-size: 1em;
-  font-weight: 700;
   background: #0b1120;
 }
 

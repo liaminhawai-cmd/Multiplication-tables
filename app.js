@@ -61,9 +61,9 @@
       axis: range(1, 12), target: (r, c) => r === 10 || c === 10 },
     { id: "PZ_INT", name: "My Weak Spots", desc: "Personalized — your most-missed times tables",
       domain: "int", category: "core", dynamic: true, axis: [], target: () => false },
-    { id: "FULL", name: "Full 12×12 Chart", desc: "A browsable reference chart — no quiz, no timer",
-      category: "playground", reference: true, untimed: true, domain: "int",
-      axis: range(1, 12), target: () => false },
+    { id: "FULL", name: "Full 12×12 Chart", desc: "Every cell is a question — answer it and find out right away, no timer",
+      category: "playground", immediateFeedback: true, untimed: true, domain: "int",
+      axis: range(1, 12), target: () => true },
     { id: "G", name: "Squares to 15", desc: "n × n up to 15", domain: "int", category: "extension",
       axis: range(1, 15), target: (r, c) => r === c },
     { id: "H", name: "Squares to 25", desc: "Extension: n × n from 11 to 25", domain: "int", category: "extension",
@@ -91,9 +91,10 @@
   ];
 
   const TIMER_MODES = [
+    { id: "120", label: "2:00", seconds: 120 },
     { id: "60", label: "1:00", seconds: 60 },
-    { id: "45", label: "0:45", seconds: 45 },
     { id: "30", label: "0:30", seconds: 30 },
+    { id: "20", label: "0:20", seconds: 20 },
   ];
 
   // Untimed levels get a single "Practice" slot instead of the timer tiers.
@@ -226,6 +227,7 @@
   let pendingResumeLevel = null;
   let pendingResumeMode = null;
   let bigPictureMode = localStorage.getItem("multab_big_picture") === "1";
+  let extensionExpanded = localStorage.getItem("multab_extension_expanded") === "1";
 
   // ---------- DOM refs ----------
   const $ = (sel) => document.querySelector(sel);
@@ -292,7 +294,7 @@
   function buildLevelCard(lvl) {
     const locked = lvl.prereq && !isLevelBeaten(lvl.prereq);
     const card = document.createElement("button");
-    card.className = "level-card" + (locked ? " locked" : "") + (lvl.reference ? " playground-card" : "");
+    card.className = "level-card" + (locked ? " locked" : "") + (lvl.immediateFeedback ? " playground-card" : "");
     card.type = "button";
     card.disabled = locked;
     if (selectedLevel && selectedLevel.id === lvl.id) card.classList.add("selected");
@@ -308,9 +310,9 @@
       return card;
     }
 
-    if (lvl.reference) {
+    if (lvl.immediateFeedback) {
       card.innerHTML = `
-        <div class="level-code">📖 Reference chart</div>
+        <div class="level-code">🧮 Playground</div>
         <div class="level-name">${lvl.name}</div>
         <div class="level-desc">${lvl.desc}</div>
       `;
@@ -344,9 +346,27 @@
     LEVEL_SECTIONS.forEach((section) => {
       const levelsInSection = LEVELS.filter((l) => l.category === section.key);
       if (!levelsInSection.length) return;
-      const heading = document.createElement("h2");
-      heading.textContent = section.title;
-      levelSections.appendChild(heading);
+
+      // Extension is squares/decimals/fractions — extra material, not the
+      // core curriculum — so it stays tucked behind a toggle by default.
+      if (section.key === "extension") {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "section-toggle";
+        toggle.innerHTML = `<span>${extensionExpanded ? "▾" : "▸"} ${section.title}</span><span class="section-toggle-count">${levelsInSection.length} level${levelsInSection.length === 1 ? "" : "s"}</span>`;
+        toggle.addEventListener("click", () => {
+          extensionExpanded = !extensionExpanded;
+          localStorage.setItem("multab_extension_expanded", extensionExpanded ? "1" : "0");
+          renderLevelGrid();
+        });
+        levelSections.appendChild(toggle);
+        if (!extensionExpanded) return;
+      } else {
+        const heading = document.createElement("h2");
+        heading.textContent = section.title;
+        levelSections.appendChild(heading);
+      }
+
       const grid = document.createElement("div");
       grid.className = "level-grid" + (section.key === "playground" ? " playground-grid" : "");
       levelsInSection.forEach((lvl) => grid.appendChild(buildLevelCard(lvl)));
@@ -371,8 +391,8 @@
       timerSelectHeading.textContent = "No timer";
       const note = document.createElement("p");
       note.className = "timer-note";
-      note.textContent = selectedLevel.reference
-        ? "This is a browsable reference chart — every answer is already filled in. No quiz, no timer, just look things up."
+      note.textContent = selectedLevel.immediateFeedback
+        ? "Answer any cell and find out right away — no timer, no Finish button, just play."
         : "Free practice — take as long as you like. The clock counts up so you can still see your time.";
       timerSelect.appendChild(note);
       return;
@@ -395,7 +415,7 @@
 
   function updateStartBtn() {
     startBtn.disabled = !selectedLevel;
-    startBtn.textContent = selectedLevel?.reference ? "View Chart" : "Start Level";
+    startBtn.textContent = selectedLevel?.immediateFeedback ? "Open Playground" : "Start Level";
   }
 
   startBtn.addEventListener("click", () => startSession());
@@ -509,12 +529,6 @@
             td.appendChild(buildCellInput(ri, ci, round2(r * c), question, r, c));
           }
           targetCells.push({ id: cellId(ri, ci), ri, ci });
-        } else if (level.reference) {
-          // A pure reference chart shows the answer, not the question — the
-          // whole point is to look products up at a glance.
-          td.className = "cell-ref cell-ref-answer";
-          td.textContent = fmt(round2(r * c));
-          td.title = question;
         } else {
           td.className = "cell-ref";
           td.textContent = question;
@@ -671,52 +685,14 @@
   const hudStreakLabel = hudStreak.previousElementSibling;
   const resultStreakLabel = $("#result-best-streak").nextElementSibling;
 
-  // A reference chart is a browsable poster, not a quiz: every cell already
-  // shows its answer, there's nothing to grade, no timer, no Finish button —
-  // just the grid and a way back.
-  function startReferenceSession(level, afterLeave) {
-    clearTimeout(pendingAdvanceTimeout);
-    pendingAdvanceTimeout = null;
-    requestFullscreenSafe();
-    session = { level, mode: FREE_MODE, reference: true, cells: [] };
-
-    hudLevel.textContent = `${level.id} · Reference`;
-    hudScoreLabel.textContent = "";
-    hudStreakLabel.textContent = "";
-    hudScore.textContent = "";
-    hudStreak.textContent = "";
-    hudTimer.textContent = "";
-    timerBarTrack.classList.add("hidden");
-
-    tableContainer.innerHTML = "";
-    tableContainer.appendChild(buildGridTable(level, level.axis, level.axis, session.cells));
-
-    tableHint.classList.add("hidden");
-    bigPictureControl.classList.add("hidden");
-    finishBtn.classList.add("hidden");
-    finishWarning.classList.add("hidden");
-    quitBtn.textContent = "Back to levels";
-
-    showView("quiz");
-    if (afterLeave) {
-      cheatBanner.classList.remove("hidden");
-      clearTimeout(bannerTimeout);
-      bannerTimeout = setTimeout(() => cheatBanner.classList.add("hidden"), 4000);
-    } else {
-      cheatBanner.classList.add("hidden");
-    }
-  }
-
   function startSession(afterLeave) {
     if (!selectedLevel) return;
     clearTimeout(pendingAdvanceTimeout);
     pendingAdvanceTimeout = null;
     requestFullscreenSafe();
     const level = selectedLevel;
-    if (level.reference) return startReferenceSession(level, afterLeave);
     if (level.dynamic) refreshDynamicLevel(level);
     quitBtn.textContent = "Quit";
-    finishBtn.classList.remove("hidden");
     const mode = level.untimed ? FREE_MODE : selectedMode;
     const { rows, cols } = visibleAxes(level);
     session = {
@@ -728,6 +704,8 @@
       axisCols: cols,
       cells: [],
       locked: false,
+      score: 0,
+      streak: 0,
     };
     hudLevel.textContent = `${level.id} · ${mode.label}`;
     timerBarTrack.classList.toggle("hidden", !!level.untimed);
@@ -737,7 +715,7 @@
     tableContainer.innerHTML = "";
     tableContainer.appendChild(buildGridTable(level, rows, cols, session.cells));
 
-    tableHint.classList.remove("hidden");
+    tableHint.classList.toggle("hidden", !!level.immediateFeedback);
     bigPictureControl.classList.remove("hidden");
 
     showView("quiz");
@@ -749,15 +727,28 @@
       cheatBanner.classList.add("hidden");
     }
 
-    // No live right/wrong feedback while playing — the HUD tracks how many
-    // cells are left instead, so progress shows without spoiling correctness.
-    // Everything gets graded and revealed at the end.
-    hudScoreLabel.textContent = "Left";
-    hudStreakLabel.textContent = "To do";
-    hudScore.textContent = String(session.cells.length);
-    hudStreak.textContent = String(session.cells.length);
-    finishWarning.classList.add("hidden");
-    finishBtn.classList.remove("ready");
+    if (level.immediateFeedback) {
+      // Playground: every answer is graded the instant it's entered, so the
+      // HUD tracks a running score/streak instead of a "left to do" count,
+      // and there's no Finish button — just play until you're done.
+      hudScoreLabel.textContent = "Score";
+      hudStreakLabel.textContent = "Streak";
+      hudScore.textContent = "0";
+      hudStreak.textContent = "0";
+      finishBtn.classList.add("hidden");
+      finishWarning.classList.add("hidden");
+    } else {
+      // No live right/wrong feedback while playing — the HUD tracks how many
+      // cells are left instead, so progress shows without spoiling correctness.
+      // Everything gets graded and revealed at the end.
+      hudScoreLabel.textContent = "Left";
+      hudStreakLabel.textContent = "To do";
+      hudScore.textContent = String(session.cells.length);
+      hudStreak.textContent = String(session.cells.length);
+      finishWarning.classList.add("hidden");
+      finishBtn.classList.remove("hidden");
+      finishBtn.classList.remove("ready");
+    }
     const first = document.getElementById(session.cells[0].id);
     if (first) first.focus();
 
@@ -834,8 +825,18 @@
       }
       const cellEl = fractionNumEl(input) || input;
       if (!isCellFilled(cellEl)) return;
-      moveToNearbyEmptyCell(cellEl);
-      updateBlanksLeftHud();
+      if (session.level.immediateFeedback) {
+        const isCorrect = gradeOneCell(cellEl);
+        saveFactStats();
+        session.score += isCorrect ? 1 : 0;
+        session.streak = isCorrect ? session.streak + 1 : 0;
+        hudScore.textContent = String(session.score);
+        hudStreak.textContent = String(session.streak);
+        moveToNearbyEmptyCell(cellEl);
+      } else {
+        moveToNearbyEmptyCell(cellEl);
+        updateBlanksLeftHud();
+      }
     } else if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
       moveWithArrow(input, e.key);
@@ -848,6 +849,7 @@
     const input = e.target.closest("input.cell-input");
     if (!input || !session) return;
     clearCellMissing(input);
+    if (session.level.immediateFeedback) return;
     if (!tableContainer.querySelector(".cell-missing")) finishWarning.classList.add("hidden");
     updateBlanksLeftHud();
   });
@@ -938,6 +940,57 @@
     return `${m}:${String(sec).padStart(2, "0")}`;
   }
 
+  // Grades one cell: figures out right/wrong, records it against the fact
+  // stats, and swaps the input(s) for static result markup. On a miss shows
+  // the right answer AND what they actually put, so a red cell can't be
+  // misread as "this number is wrong" when it's the correct one being
+  // revealed. Shared by the delayed (whole-table-at-once) and immediate
+  // (Playground, per-cell) grading paths.
+  function gradeOneCell(el) {
+    const denom = fractionDenomEl(el);
+    let isCorrect, answerDisplay, givenDisplay;
+    if (denom) {
+      const gn = el.value === "" ? null : parseInt(el.value, 10);
+      const gd = denom.value === "" ? null : parseInt(denom.value, 10);
+      const an = Number(el.dataset.answerN);
+      const ad = Number(el.dataset.answerD);
+      // Cross-multiply so equivalent-but-unreduced fractions (e.g. 2/4) still count.
+      isCorrect = gn !== null && gd !== null && gd !== 0 && gn * ad === an * gd;
+      answerDisplay = `${an}/${ad}`;
+      givenDisplay = gn === null && gd === null ? "—" : `${gn ?? "?"}/${gd ?? "?"}`;
+    } else {
+      const answer = parseFloat(el.dataset.answer);
+      const given = el.value;
+      isCorrect = given !== "" && Math.abs(parseFloat(given) - answer) < 0.001;
+      answerDisplay = el.dataset.answer;
+      givenDisplay = given === "" ? "—" : given;
+    }
+    recordFactResult(session.level.domain, Number(el.dataset.factR), Number(el.dataset.factC), isCorrect);
+
+    const result = document.createElement("div");
+    result.className = "cell-result";
+    result.id = el.id; // keep the id alive so lookups/navigation still find this cell
+
+    const answerEl = document.createElement("span");
+    answerEl.className = "cell-answer";
+    answerEl.textContent = answerDisplay;
+    result.appendChild(answerEl);
+
+    if (!isCorrect) {
+      const yours = document.createElement("span");
+      yours.className = "cell-yours";
+      yours.textContent = `you: ${givenDisplay}`;
+      result.appendChild(yours);
+    }
+
+    const td = el.closest("td");
+    td.innerHTML = "";
+    td.appendChild(result);
+    td.classList.remove("cell-data");
+    td.classList.add(isCorrect ? "cell-correct" : "cell-wrong");
+    return isCorrect;
+  }
+
   // Nothing is graded while playing — every blank is revealed and scored only
   // once the table is finished (early) or the timer runs out.
   function gradeInteractiveSession() {
@@ -945,50 +998,7 @@
     session.cells.forEach((c) => {
       const el = document.getElementById(c.id);
       if (!el) return;
-      const denom = fractionDenomEl(el);
-      let isCorrect, answerDisplay, givenDisplay;
-      if (denom) {
-        const gn = el.value === "" ? null : parseInt(el.value, 10);
-        const gd = denom.value === "" ? null : parseInt(denom.value, 10);
-        const an = Number(el.dataset.answerN);
-        const ad = Number(el.dataset.answerD);
-        // Cross-multiply so equivalent-but-unreduced fractions (e.g. 2/4) still count.
-        isCorrect = gn !== null && gd !== null && gd !== 0 && gn * ad === an * gd;
-        answerDisplay = `${an}/${ad}`;
-        givenDisplay = gn === null && gd === null ? "—" : `${gn ?? "?"}/${gd ?? "?"}`;
-      } else {
-        const answer = parseFloat(el.dataset.answer);
-        const given = el.value;
-        isCorrect = given !== "" && Math.abs(parseFloat(given) - answer) < 0.001;
-        answerDisplay = el.dataset.answer;
-        givenDisplay = given === "" ? "—" : given;
-      }
-      if (isCorrect) correct += 1;
-      recordFactResult(session.level.domain, Number(el.dataset.factR), Number(el.dataset.factC), isCorrect);
-
-      // Swap the input for static markup. On a miss show the right answer AND
-      // what they actually put, so a red cell can't be misread as "this number
-      // is wrong" when it's the correct one being revealed.
-      const result = document.createElement("div");
-      result.className = "cell-result";
-
-      const answerEl = document.createElement("span");
-      answerEl.className = "cell-answer";
-      answerEl.textContent = answerDisplay;
-      result.appendChild(answerEl);
-
-      if (!isCorrect) {
-        const yours = document.createElement("span");
-        yours.className = "cell-yours";
-        yours.textContent = `you: ${givenDisplay}`;
-        result.appendChild(yours);
-      }
-
-      const td = el.closest("td");
-      td.innerHTML = "";
-      td.appendChild(result);
-      td.classList.remove("cell-data");
-      td.classList.add(isCorrect ? "cell-correct" : "cell-wrong");
+      if (gradeOneCell(el)) correct += 1;
     });
     saveFactStats();
     return { correct, attempted: session.cells.length };
