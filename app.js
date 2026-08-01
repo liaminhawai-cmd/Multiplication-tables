@@ -18,17 +18,20 @@
   // "wonky", which the proportional grid layout then shows visually.
   function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
   function buildFractionAxis(denominators, cap) {
-    const points = new Map(); // value -> label
+    const points = new Map(); // value -> { label, n, d }
     denominators.forEach((d) => {
       for (let k = 1; k <= cap * d; k++) {
         const g = gcd(k, d);
         const n = k / g, rd = d / g;
         const value = n / rd;
-        if (!points.has(value)) points.set(value, rd === 1 ? String(n) : `${n}/${rd}`);
+        if (!points.has(value)) points.set(value, { label: rd === 1 ? String(n) : `${n}/${rd}`, n, d: rd });
       }
     });
     const axis = Array.from(points.keys()).sort((a, b) => a - b);
-    return { axis, labels: points };
+    const labels = new Map();
+    const parts = new Map();
+    points.forEach((v, k) => { labels.set(k, v.label); parts.set(k, { n: v.n, d: v.d }); });
+    return { axis, labels, parts };
   }
 
   const FRACTIONS_HALVES = buildFractionAxis([2], 3);
@@ -76,15 +79,15 @@
     { id: "PZ_DEC", name: "My Weak Spots (Decimals)", desc: "Personalized — your most-missed decimal facts",
       domain: "decimal", category: "extension", dynamic: true, axis: DECIMAL_AXIS, target: () => false },
     { id: "FR_HALVES", name: "Halves to 3", desc: "Fractions: ½ steps up to 3", domain: "fraction", category: "extension",
-      proportional: true, axis: FRACTIONS_HALVES.axis, fractionLabels: FRACTIONS_HALVES.labels, target: () => true },
+      proportional: true, axis: FRACTIONS_HALVES.axis, fractionLabels: FRACTIONS_HALVES.labels, fractionParts: FRACTIONS_HALVES.parts, target: () => true },
     { id: "FR_THIRDS", name: "Thirds to 2", desc: "Fractions: ⅓ steps up to 2", domain: "fraction", category: "extension",
-      proportional: true, prereq: "FR_HALVES", axis: FRACTIONS_THIRDS.axis, fractionLabels: FRACTIONS_THIRDS.labels, target: () => true },
+      proportional: true, prereq: "FR_HALVES", axis: FRACTIONS_THIRDS.axis, fractionLabels: FRACTIONS_THIRDS.labels, fractionParts: FRACTIONS_THIRDS.parts, target: () => true },
     { id: "FR_HALVES_THIRDS", name: "Halves & Thirds to 2", desc: "Fractions: ½s and ⅓s combined", domain: "fraction", category: "extension",
-      proportional: true, prereq: "FR_THIRDS", axis: FRACTIONS_HALVES_THIRDS.axis, fractionLabels: FRACTIONS_HALVES_THIRDS.labels, target: () => true },
+      proportional: true, prereq: "FR_THIRDS", axis: FRACTIONS_HALVES_THIRDS.axis, fractionLabels: FRACTIONS_HALVES_THIRDS.labels, fractionParts: FRACTIONS_HALVES_THIRDS.parts, target: () => true },
     { id: "FR_FOURTHS", name: "Fourths to 2", desc: "Fractions: ¼ steps up to 2", domain: "fraction", category: "extension",
-      proportional: true, prereq: "FR_HALVES_THIRDS", axis: FRACTIONS_FOURTHS.axis, fractionLabels: FRACTIONS_FOURTHS.labels, target: () => true },
+      proportional: true, prereq: "FR_HALVES_THIRDS", axis: FRACTIONS_FOURTHS.axis, fractionLabels: FRACTIONS_FOURTHS.labels, fractionParts: FRACTIONS_FOURTHS.parts, target: () => true },
     { id: "FR_FIFTHS", name: "Fifths to 2", desc: "Fractions: ⅕ steps up to 2", domain: "fraction", category: "extension",
-      proportional: true, prereq: "FR_FOURTHS", axis: FRACTIONS_FIFTHS.axis, fractionLabels: FRACTIONS_FIFTHS.labels, target: () => true },
+      proportional: true, prereq: "FR_FOURTHS", axis: FRACTIONS_FIFTHS.axis, fractionLabels: FRACTIONS_FIFTHS.labels, fractionParts: FRACTIONS_FIFTHS.parts, target: () => true },
   ];
 
   const TIMER_MODES = [
@@ -496,7 +499,15 @@
         const question = `${fmt(r, level)} × ${fmt(c, level)}`;
         if (level.target(r, c)) {
           td.className = "cell-data";
-          td.appendChild(buildCellInput(ri, ci, round2(r * c), question, r, c));
+          if (level.fractionParts) {
+            const rp = level.fractionParts.get(r);
+            const cp = level.fractionParts.get(c);
+            const rawN = rp.n * cp.n, rawD = rp.d * cp.d;
+            const g = gcd(rawN, rawD);
+            td.appendChild(buildFractionCellInput(ri, ci, rawN / g, rawD / g, question, r, c));
+          } else {
+            td.appendChild(buildCellInput(ri, ci, round2(r * c), question, r, c));
+          }
           targetCells.push({ id: cellId(ri, ci), ri, ci });
         } else if (level.reference) {
           // A pure reference chart shows the answer, not the question — the
@@ -534,6 +545,81 @@
     return input;
   }
 
+  // Fraction answers can't be typed as "n/d" (no slash on a numeric keypad,
+  // and it reads badly anyway) — instead render the classic stacked
+  // numerator-over-denominator box with a dividing line, like on paper.
+  // Enter moves numerator -> denominator -> (once both are filled) on to the
+  // next blank cell.
+  function buildFractionCellInput(ri, ci, answerN, answerD, question, r, c) {
+    const wrap = document.createElement("div");
+    wrap.className = "cell-fraction";
+    wrap.title = question;
+
+    const num = document.createElement("input");
+    num.type = "number";
+    num.step = "1";
+    num.inputMode = "numeric";
+    num.autocomplete = "off";
+    num.className = "cell-input frac-num";
+    num.id = cellId(ri, ci);
+    num.dataset.ri = ri;
+    num.dataset.ci = ci;
+    num.dataset.answerN = answerN;
+    num.dataset.answerD = answerD;
+    num.dataset.question = question;
+    num.dataset.factR = r;
+    num.dataset.factC = c;
+    num.dataset.fracPart = "n";
+    num.placeholder = "n";
+
+    const bar = document.createElement("div");
+    bar.className = "frac-bar";
+
+    const den = document.createElement("input");
+    den.type = "number";
+    den.step = "1";
+    den.inputMode = "numeric";
+    den.autocomplete = "off";
+    den.className = "cell-input frac-den";
+    den.id = `${cellId(ri, ci)}-d`;
+    den.dataset.ri = ri;
+    den.dataset.ci = ci;
+    den.dataset.fracPart = "d";
+    den.placeholder = "d";
+
+    wrap.appendChild(num);
+    wrap.appendChild(bar);
+    wrap.appendChild(den);
+    return wrap;
+  }
+
+  // A fraction cell is really two inputs (numerator id, denominator id+"-d")
+  // but everywhere else in the app treats it as one logical cell keyed by the
+  // numerator's id — these helpers bridge that.
+  function fractionDenomEl(el) {
+    return el.dataset.fracPart === "n" ? document.getElementById(`${el.id}-d`) : null;
+  }
+  function fractionNumEl(el) {
+    return el.dataset.fracPart === "d" ? document.getElementById(el.id.slice(0, -2)) : null;
+  }
+  function isCellFilled(el) {
+    const denom = fractionDenomEl(el);
+    if (denom) return el.value !== "" && denom.value !== "";
+    return el.value !== "";
+  }
+  function markCellMissing(el) {
+    el.classList.add("cell-missing");
+    const denom = fractionDenomEl(el);
+    if (denom) denom.classList.add("cell-missing");
+  }
+  function clearCellMissing(el) {
+    el.classList.remove("cell-missing");
+    const denom = fractionDenomEl(el);
+    if (denom) denom.classList.remove("cell-missing");
+    const num = fractionNumEl(el);
+    if (num) num.classList.remove("cell-missing");
+  }
+
   // Toggling mid-level rebuilds the table (the visible rows/cols change), so
   // carry any answers already typed across to the new layout.
   bigPictureToggle.checked = bigPictureMode;
@@ -548,7 +634,15 @@
     const saved = new Map();
     session.cells.forEach((cell) => {
       const el = document.getElementById(cell.id);
-      if (el && el.value !== "") saved.set(`${session.axisRows[cell.ri]}x${session.axisCols[cell.ci]}`, el.value);
+      if (!el) return;
+      const denom = fractionDenomEl(el);
+      if (denom) {
+        if (el.value !== "" || denom.value !== "") {
+          saved.set(`${session.axisRows[cell.ri]}x${session.axisCols[cell.ci]}`, { n: el.value, d: denom.value });
+        }
+      } else if (el.value !== "") {
+        saved.set(`${session.axisRows[cell.ri]}x${session.axisCols[cell.ci]}`, el.value);
+      }
     });
 
     const { rows, cols } = visibleAxes(level);
@@ -560,12 +654,17 @@
 
     session.cells.forEach((cell) => {
       const key = `${rows[cell.ri]}x${cols[cell.ci]}`;
-      if (saved.has(key)) document.getElementById(cell.id).value = saved.get(key);
+      if (!saved.has(key)) return;
+      const el = document.getElementById(cell.id);
+      const value = saved.get(key);
+      const denom = fractionDenomEl(el);
+      if (denom && typeof value === "object") { el.value = value.n; denom.value = value.d; }
+      else if (!denom) el.value = value;
     });
     finishWarning.classList.add("hidden");
     updateBlanksLeftHud();
-    const firstEmpty = session.cells.find((c) => document.getElementById(c.id).value === "");
-    if (firstEmpty) document.getElementById(firstEmpty.id).focus();
+    const firstEmpty = session.cells.map((c) => document.getElementById(c.id)).find((el) => el && !isCellFilled(el));
+    if (firstEmpty) firstEmpty.focus();
   }
 
   const hudScoreLabel = hudScore.previousElementSibling;
@@ -702,7 +801,7 @@
     for (let step = 1; step <= cells.length; step++) {
       const next = cells[(idx + step) % cells.length];
       const el = document.getElementById(next.id);
-      if (el && el.value === "") { el.focus(); return; }
+      if (el && !isCellFilled(el)) { el.focus(); return; }
     }
     input.blur();
   }
@@ -710,7 +809,7 @@
   function emptyCells() {
     return session.cells
       .map((c) => document.getElementById(c.id))
-      .filter((el) => el && el.value === "");
+      .filter((el) => el && !isCellFilled(el));
   }
 
   function updateBlanksLeftHud() {
@@ -726,8 +825,16 @@
     if (!input || !session) return;
     if (e.key === "Enter") {
       e.preventDefault();
-      if (input.disabled || input.value === "") return;
-      moveToNearbyEmptyCell(input);
+      if (input.disabled) return;
+      if (input.dataset.fracPart === "n") {
+        // Numerator -> denominator, no matter what's typed yet.
+        const denom = fractionDenomEl(input);
+        if (denom) denom.focus();
+        return;
+      }
+      const cellEl = fractionNumEl(input) || input;
+      if (!isCellFilled(cellEl)) return;
+      moveToNearbyEmptyCell(cellEl);
       updateBlanksLeftHud();
     } else if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
@@ -740,7 +847,7 @@
   tableContainer.addEventListener("input", (e) => {
     const input = e.target.closest("input.cell-input");
     if (!input || !session) return;
-    input.classList.remove("cell-missing");
+    clearCellMissing(input);
     if (!tableContainer.querySelector(".cell-missing")) finishWarning.classList.add("hidden");
     updateBlanksLeftHud();
   });
@@ -755,7 +862,7 @@
       finishEarly();
       return;
     }
-    empties.forEach((el) => el.classList.add("cell-missing"));
+    empties.forEach((el) => markCellMissing(el));
     finishWarning.textContent = `Still ${empties.length} to go — fill in the highlighted cell${empties.length === 1 ? "" : "s"} before finishing.`;
     finishWarning.classList.remove("hidden");
     empties[0].scrollIntoView({ block: "center", behavior: "smooth" });
@@ -838,9 +945,24 @@
     session.cells.forEach((c) => {
       const el = document.getElementById(c.id);
       if (!el) return;
-      const answer = parseFloat(el.dataset.answer);
-      const given = el.value;
-      const isCorrect = given !== "" && Math.abs(parseFloat(given) - answer) < 0.001;
+      const denom = fractionDenomEl(el);
+      let isCorrect, answerDisplay, givenDisplay;
+      if (denom) {
+        const gn = el.value === "" ? null : parseInt(el.value, 10);
+        const gd = denom.value === "" ? null : parseInt(denom.value, 10);
+        const an = Number(el.dataset.answerN);
+        const ad = Number(el.dataset.answerD);
+        // Cross-multiply so equivalent-but-unreduced fractions (e.g. 2/4) still count.
+        isCorrect = gn !== null && gd !== null && gd !== 0 && gn * ad === an * gd;
+        answerDisplay = `${an}/${ad}`;
+        givenDisplay = gn === null && gd === null ? "—" : `${gn ?? "?"}/${gd ?? "?"}`;
+      } else {
+        const answer = parseFloat(el.dataset.answer);
+        const given = el.value;
+        isCorrect = given !== "" && Math.abs(parseFloat(given) - answer) < 0.001;
+        answerDisplay = el.dataset.answer;
+        givenDisplay = given === "" ? "—" : given;
+      }
       if (isCorrect) correct += 1;
       recordFactResult(session.level.domain, Number(el.dataset.factR), Number(el.dataset.factC), isCorrect);
 
@@ -852,13 +974,13 @@
 
       const answerEl = document.createElement("span");
       answerEl.className = "cell-answer";
-      answerEl.textContent = el.dataset.answer;
+      answerEl.textContent = answerDisplay;
       result.appendChild(answerEl);
 
       if (!isCorrect) {
         const yours = document.createElement("span");
         yours.className = "cell-yours";
-        yours.textContent = given === "" ? "you: —" : `you: ${given}`;
+        yours.textContent = `you: ${givenDisplay}`;
         result.appendChild(yours);
       }
 

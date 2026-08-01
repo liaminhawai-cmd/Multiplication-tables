@@ -493,6 +493,33 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 }
 .cell-input[type="number"] { -moz-appearance: textfield; }
 
+/* Fraction answer cells: stacked numerator/denominator boxes with a
+   dividing line, like a fraction written on paper — no "/" key needed. */
+.cell-fraction {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  padding: 4px 6px;
+}
+
+.cell-fraction .cell-input {
+  padding: 2px;
+  height: auto;
+  min-height: 1.4em;
+  font-size: 0.95em;
+}
+
+.cell-fraction .frac-bar {
+  height: 2px;
+  background: var(--text);
+  opacity: 0.6;
+  margin: 2px 4px;
+}
+
+.cell-fraction .cell-input.cell-missing { border-radius: 3px; }
+
 /* Result reveal: replaces the input once graded. On a miss, show the
    correct answer plus what was actually typed, so a red cell never reads
    as "this number is wrong" when it's the right answer being shown. */
