@@ -862,13 +862,7 @@
       const cellEl = fractionNumEl(input) || input;
       if (!isCellFilled(cellEl)) return;
       if (session.level.immediateFeedback) {
-        const isCorrect = gradeOneCell(cellEl);
-        saveFactStats();
-        session.score += isCorrect ? 1 : 0;
-        session.streak = isCorrect ? session.streak + 1 : 0;
-        hudScore.textContent = String(session.score);
-        hudStreak.textContent = String(session.streak);
-        moveToNearbyEmptyCell(cellEl);
+        commitImmediateCell(cellEl, true);
       } else {
         moveToNearbyEmptyCell(cellEl);
         updateBlanksLeftHud();
@@ -877,6 +871,37 @@
       e.preventDefault();
       moveWithArrow(input, e.key);
     }
+  });
+
+  // Playground only: grade a cell the moment it's answered and update the
+  // running score/streak. `advance` moves focus on to the next blank, which
+  // we only want when Enter was pressed — on a click-away the player has
+  // already chosen where they're going.
+  function commitImmediateCell(cellEl, advance) {
+    if (!cellEl.isConnected || cellEl.tagName !== "INPUT") return; // already graded
+    const isCorrect = gradeOneCell(cellEl);
+    saveFactStats();
+    session.score += isCorrect ? 1 : 0;
+    session.streak = isCorrect ? session.streak + 1 : 0;
+    hudScore.textContent = String(session.score);
+    hudStreak.textContent = String(session.streak);
+    if (advance) moveToNearbyEmptyCell(cellEl);
+  }
+
+  // Typing an answer and clicking (or tabbing) to another cell counts as
+  // answering it — without this, feedback would only ever appear for players
+  // who happen to press Enter.
+  tableContainer.addEventListener("focusout", (e) => {
+    if (!session || !session.level.immediateFeedback) return;
+    const input = e.target.closest && e.target.closest("input.cell-input");
+    if (!input) return;
+    // Focus hopping numerator -> denominator within one cell isn't an answer yet.
+    const movingWithinCell = e.relatedTarget && e.relatedTarget.closest
+      && e.relatedTarget.closest("td") === input.closest("td");
+    if (movingWithinCell) return;
+    const cellEl = fractionNumEl(input) || input;
+    if (!isCellFilled(cellEl)) return;
+    commitImmediateCell(cellEl, false);
   });
 
   // Typing anywhere refreshes the count and clears any "you missed this"
