@@ -37,46 +37,53 @@
   const FRACTIONS_FOURTHS = buildFractionAxis([4], 2);
   const FRACTIONS_FIFTHS = buildFractionAxis([5], 2);
 
+  // Level select groups levels by `category`:
+  //  "core"       — Times Tables section
+  //  "playground" — the untimed reference chart, shown as its own banner
+  //  "extension"  — squares, decimals, fractions, decimal weak-spots
   const LEVELS = [
-    { id: "A", name: "1–5 × 1–5", desc: "Small numbers warm-up", domain: "int",
+    { id: "A", name: "1–5 × 1–5", desc: "Small numbers warm-up", domain: "int", category: "core",
       axis: range(1, 12), target: (r, c) => r <= 5 && c <= 5 },
-    { id: "B", name: "Evens", desc: "Even times tables", domain: "int",
+    { id: "B", name: "Evens", desc: "Even times tables", domain: "int", category: "core",
       axis: range(1, 12), target: (r, c) => r % 2 === 0 && c % 2 === 0 },
-    { id: "C", name: "6–9 × 3–5", desc: "Mid-range mix", domain: "int",
+    { id: "C", name: "6–9 × 3–5", desc: "Mid-range mix", domain: "int", category: "core",
       axis: range(1, 12), target: (r, c) => between(r, 6, 9) && between(c, 3, 5) },
-    { id: "D", name: "7s and 9s", desc: "Focus on the 7 and 9 tables", domain: "int",
+    { id: "D", name: "7s and 9s", desc: "Focus on the 7 and 9 tables", domain: "int", category: "core",
       axis: range(1, 12), target: (r, c) => r === 7 || r === 9 || c === 7 || c === 9 },
-    { id: "E", name: "6–10 × 6–10", desc: "Higher numbers", domain: "int",
+    { id: "E", name: "6–10 × 6–10", desc: "Higher numbers", domain: "int", category: "core",
       axis: range(1, 12), target: (r, c) => between(r, 6, 10) && between(c, 6, 10) },
-    { id: "F", name: "Odd × Odd", desc: "Odd numbers only", domain: "int",
+    { id: "F", name: "Odd × Odd", desc: "Odd numbers only", domain: "int", category: "core",
       axis: range(1, 12), target: (r, c) => r % 2 !== 0 && c % 2 !== 0 },
-    { id: "G", name: "Squares to 15", desc: "n × n up to 15", domain: "int",
-      axis: range(1, 15), target: (r, c) => r === c },
-    { id: "FULL", name: "Full 12×12", desc: "Free practice — no timer", untimed: true, domain: "int",
-      axis: range(1, 12), target: () => true },
-    { id: "H", name: "Squares to 25", desc: "Extension: n × n from 11 to 25", domain: "int",
-      axis: range(11, 25), target: (r, c) => r === c },
-    { id: "I", name: "Squares to 30", desc: "Extension: n × n from 16 to 30", domain: "int",
-      axis: range(16, 30), target: (r, c) => r === c },
-    { id: "J", name: "Decimals (all)", desc: "Every decimal pair 0.2–2", domain: "decimal",
-      axis: DECIMAL_AXIS, target: () => true },
-    { id: "K", name: "Decimals 0.2–1", desc: "Smaller decimal pairs", domain: "decimal",
-      axis: DECIMAL_AXIS, target: (r, c) => between(r, 0.2, 1) && between(c, 0.2, 1) },
-    { id: "L", name: "Decimals 0.6–1.4", desc: "Middle decimal pairs", domain: "decimal",
-      axis: DECIMAL_AXIS, target: (r, c) => between(r, 0.6, 1.4) && between(c, 0.6, 1.4) },
+    { id: "TEN", name: "10s", desc: "Focus on the 10 times table", domain: "int", category: "core",
+      axis: range(1, 12), target: (r, c) => r === 10 || c === 10 },
     { id: "PZ_INT", name: "My Weak Spots", desc: "Personalized — your most-missed times tables",
-      domain: "int", dynamic: true, axis: [], target: () => false },
+      domain: "int", category: "core", dynamic: true, axis: [], target: () => false },
+    { id: "FULL", name: "Full 12×12 Chart", desc: "A browsable reference chart — no quiz, no timer",
+      category: "playground", reference: true, untimed: true, domain: "int",
+      axis: range(1, 12), target: () => false },
+    { id: "G", name: "Squares to 15", desc: "n × n up to 15", domain: "int", category: "extension",
+      axis: range(1, 15), target: (r, c) => r === c },
+    { id: "H", name: "Squares to 25", desc: "Extension: n × n from 11 to 25", domain: "int", category: "extension",
+      axis: range(11, 25), target: (r, c) => r === c },
+    { id: "I", name: "Squares to 30", desc: "Extension: n × n from 16 to 30", domain: "int", category: "extension",
+      axis: range(16, 30), target: (r, c) => r === c },
+    { id: "J", name: "Decimals (all)", desc: "Every decimal pair 0.2–2", domain: "decimal", category: "extension",
+      axis: DECIMAL_AXIS, target: () => true },
+    { id: "K", name: "Decimals 0.2–1", desc: "Smaller decimal pairs", domain: "decimal", category: "extension",
+      axis: DECIMAL_AXIS, target: (r, c) => between(r, 0.2, 1) && between(c, 0.2, 1) },
+    { id: "L", name: "Decimals 0.6–1.4", desc: "Middle decimal pairs", domain: "decimal", category: "extension",
+      axis: DECIMAL_AXIS, target: (r, c) => between(r, 0.6, 1.4) && between(c, 0.6, 1.4) },
     { id: "PZ_DEC", name: "My Weak Spots (Decimals)", desc: "Personalized — your most-missed decimal facts",
-      domain: "decimal", dynamic: true, axis: DECIMAL_AXIS, target: () => false },
-    { id: "FR_HALVES", name: "Halves to 3", desc: "Fractions: ½ steps up to 3", domain: "fraction",
+      domain: "decimal", category: "extension", dynamic: true, axis: DECIMAL_AXIS, target: () => false },
+    { id: "FR_HALVES", name: "Halves to 3", desc: "Fractions: ½ steps up to 3", domain: "fraction", category: "extension",
       proportional: true, axis: FRACTIONS_HALVES.axis, fractionLabels: FRACTIONS_HALVES.labels, target: () => true },
-    { id: "FR_THIRDS", name: "Thirds to 2", desc: "Fractions: ⅓ steps up to 2", domain: "fraction",
+    { id: "FR_THIRDS", name: "Thirds to 2", desc: "Fractions: ⅓ steps up to 2", domain: "fraction", category: "extension",
       proportional: true, prereq: "FR_HALVES", axis: FRACTIONS_THIRDS.axis, fractionLabels: FRACTIONS_THIRDS.labels, target: () => true },
-    { id: "FR_HALVES_THIRDS", name: "Halves & Thirds to 2", desc: "Fractions: ½s and ⅓s combined", domain: "fraction",
+    { id: "FR_HALVES_THIRDS", name: "Halves & Thirds to 2", desc: "Fractions: ½s and ⅓s combined", domain: "fraction", category: "extension",
       proportional: true, prereq: "FR_THIRDS", axis: FRACTIONS_HALVES_THIRDS.axis, fractionLabels: FRACTIONS_HALVES_THIRDS.labels, target: () => true },
-    { id: "FR_FOURTHS", name: "Fourths to 2", desc: "Fractions: ¼ steps up to 2", domain: "fraction",
+    { id: "FR_FOURTHS", name: "Fourths to 2", desc: "Fractions: ¼ steps up to 2", domain: "fraction", category: "extension",
       proportional: true, prereq: "FR_HALVES_THIRDS", axis: FRACTIONS_FOURTHS.axis, fractionLabels: FRACTIONS_FOURTHS.labels, target: () => true },
-    { id: "FR_FIFTHS", name: "Fifths to 2", desc: "Fractions: ⅕ steps up to 2", domain: "fraction",
+    { id: "FR_FIFTHS", name: "Fifths to 2", desc: "Fractions: ⅕ steps up to 2", domain: "fraction", category: "extension",
       proportional: true, prereq: "FR_FOURTHS", axis: FRACTIONS_FIFTHS.axis, fractionLabels: FRACTIONS_FIFTHS.labels, target: () => true },
   ];
 
@@ -219,7 +226,7 @@
 
   // ---------- DOM refs ----------
   const $ = (sel) => document.querySelector(sel);
-  const levelGrid = $("#level-grid");
+  const levelSections = $("#level-sections");
   const timerSelect = $("#timer-select");
   const timerSelectHeading = $("#timer-select-heading");
   const startBtn = $("#start-btn");
@@ -236,6 +243,7 @@
   const timerBarTrack = timerBar.parentElement;
   const cheatBanner = $("#cheat-banner");
   const finishBtn = $("#finish-btn");
+  const quitBtn = $("#quit-btn");
   const finishWarning = $("#finish-warning");
   const tableHint = $("#table-hint");
   const bigPictureControl = $("#big-picture-control");
@@ -272,28 +280,38 @@
     return Object.values(progress).some((r) => r.levelId === levelId && r.beaten);
   }
 
-  function renderLevelGrid() {
-    levelGrid.innerHTML = "";
-    LEVELS.forEach((lvl) => {
-      const locked = lvl.prereq && !isLevelBeaten(lvl.prereq);
-      const card = document.createElement("button");
-      card.className = "level-card" + (locked ? " locked" : "");
-      card.type = "button";
-      card.disabled = locked;
-      if (selectedLevel && selectedLevel.id === lvl.id) card.classList.add("selected");
+  const LEVEL_SECTIONS = [
+    { key: "core", title: "Times Tables" },
+    { key: "playground", title: "Playground" },
+    { key: "extension", title: "Extension" },
+  ];
 
-      if (locked) {
-        const prereqName = LEVELS.find((l) => l.id === lvl.prereq)?.name || lvl.prereq;
-        card.innerHTML = `
-          <div class="level-code">🔒 Locked</div>
-          <div class="level-name">${lvl.name}</div>
-          <div class="level-lock-hint">Beat "${prereqName}" to unlock</div>
-        `;
-        card.title = `Beat ${prereqName} first`;
-        levelGrid.appendChild(card);
-        return;
-      }
+  function buildLevelCard(lvl) {
+    const locked = lvl.prereq && !isLevelBeaten(lvl.prereq);
+    const card = document.createElement("button");
+    card.className = "level-card" + (locked ? " locked" : "") + (lvl.reference ? " playground-card" : "");
+    card.type = "button";
+    card.disabled = locked;
+    if (selectedLevel && selectedLevel.id === lvl.id) card.classList.add("selected");
 
+    if (locked) {
+      const prereqName = LEVELS.find((l) => l.id === lvl.prereq)?.name || lvl.prereq;
+      card.innerHTML = `
+        <div class="level-code">🔒 Locked</div>
+        <div class="level-name">${lvl.name}</div>
+        <div class="level-lock-hint">Beat "${prereqName}" to unlock</div>
+      `;
+      card.title = `Beat ${prereqName} first`;
+      return card;
+    }
+
+    if (lvl.reference) {
+      card.innerHTML = `
+        <div class="level-code">📖 Reference chart</div>
+        <div class="level-name">${lvl.name}</div>
+        <div class="level-desc">${lvl.desc}</div>
+      `;
+    } else {
       const bestStars = bestStarsAcrossModes(lvl.id);
       const ticks = modesFor(lvl).map((m) => {
         const rec = progress[progressKey(lvl.id, m.id)];
@@ -306,15 +324,30 @@
         <div class="level-stars">${bestStars > 0 ? "★".repeat(bestStars) + "☆".repeat(3 - bestStars) : ""}</div>
         <div class="level-ticks">${ticks}</div>
       `;
-      card.title = lvl.desc;
-      card.addEventListener("click", () => {
-        requestFullscreenSafe();
-        selectedLevel = lvl;
-        renderLevelGrid();
-        renderTimerSelect();
-        updateStartBtn();
-      });
-      levelGrid.appendChild(card);
+    }
+    card.title = lvl.desc;
+    card.addEventListener("click", () => {
+      requestFullscreenSafe();
+      selectedLevel = lvl;
+      renderLevelGrid();
+      renderTimerSelect();
+      updateStartBtn();
+    });
+    return card;
+  }
+
+  function renderLevelGrid() {
+    levelSections.innerHTML = "";
+    LEVEL_SECTIONS.forEach((section) => {
+      const levelsInSection = LEVELS.filter((l) => l.category === section.key);
+      if (!levelsInSection.length) return;
+      const heading = document.createElement("h2");
+      heading.textContent = section.title;
+      levelSections.appendChild(heading);
+      const grid = document.createElement("div");
+      grid.className = "level-grid" + (section.key === "playground" ? " playground-grid" : "");
+      levelsInSection.forEach((lvl) => grid.appendChild(buildLevelCard(lvl)));
+      levelSections.appendChild(grid);
     });
   }
 
@@ -335,7 +368,9 @@
       timerSelectHeading.textContent = "No timer";
       const note = document.createElement("p");
       note.className = "timer-note";
-      note.textContent = "Free practice — take as long as you like. The clock counts up so you can still see your time.";
+      note.textContent = selectedLevel.reference
+        ? "This is a browsable reference chart — every answer is already filled in. No quiz, no timer, just look things up."
+        : "Free practice — take as long as you like. The clock counts up so you can still see your time.";
       timerSelect.appendChild(note);
       return;
     }
@@ -357,10 +392,11 @@
 
   function updateStartBtn() {
     startBtn.disabled = !selectedLevel;
+    startBtn.textContent = selectedLevel?.reference ? "View Chart" : "Start Level";
   }
 
   startBtn.addEventListener("click", () => startSession());
-  $("#quit-btn").addEventListener("click", () => endSession(true));
+  quitBtn.addEventListener("click", () => endSession());
   $("#retry-btn").addEventListener("click", () => startSession());
   $("#back-btn").addEventListener("click", () => showView("select"));
 
@@ -462,6 +498,12 @@
           td.className = "cell-data";
           td.appendChild(buildCellInput(ri, ci, round2(r * c), question, r, c));
           targetCells.push({ id: cellId(ri, ci), ri, ci });
+        } else if (level.reference) {
+          // A pure reference chart shows the answer, not the question — the
+          // whole point is to look products up at a glance.
+          td.className = "cell-ref cell-ref-answer";
+          td.textContent = fmt(round2(r * c));
+          td.title = question;
         } else {
           td.className = "cell-ref";
           td.textContent = question;
@@ -530,13 +572,52 @@
   const hudStreakLabel = hudStreak.previousElementSibling;
   const resultStreakLabel = $("#result-best-streak").nextElementSibling;
 
+  // A reference chart is a browsable poster, not a quiz: every cell already
+  // shows its answer, there's nothing to grade, no timer, no Finish button —
+  // just the grid and a way back.
+  function startReferenceSession(level, afterLeave) {
+    clearTimeout(pendingAdvanceTimeout);
+    pendingAdvanceTimeout = null;
+    requestFullscreenSafe();
+    session = { level, mode: FREE_MODE, reference: true, cells: [] };
+
+    hudLevel.textContent = `${level.id} · Reference`;
+    hudScoreLabel.textContent = "";
+    hudStreakLabel.textContent = "";
+    hudScore.textContent = "";
+    hudStreak.textContent = "";
+    hudTimer.textContent = "";
+    timerBarTrack.classList.add("hidden");
+
+    tableContainer.innerHTML = "";
+    tableContainer.appendChild(buildGridTable(level, level.axis, level.axis, session.cells));
+
+    tableHint.classList.add("hidden");
+    bigPictureControl.classList.add("hidden");
+    finishBtn.classList.add("hidden");
+    finishWarning.classList.add("hidden");
+    quitBtn.textContent = "Back to levels";
+
+    showView("quiz");
+    if (afterLeave) {
+      cheatBanner.classList.remove("hidden");
+      clearTimeout(bannerTimeout);
+      bannerTimeout = setTimeout(() => cheatBanner.classList.add("hidden"), 4000);
+    } else {
+      cheatBanner.classList.add("hidden");
+    }
+  }
+
   function startSession(afterLeave) {
     if (!selectedLevel) return;
     clearTimeout(pendingAdvanceTimeout);
     pendingAdvanceTimeout = null;
     requestFullscreenSafe();
     const level = selectedLevel;
+    if (level.reference) return startReferenceSession(level, afterLeave);
     if (level.dynamic) refreshDynamicLevel(level);
+    quitBtn.textContent = "Quit";
+    finishBtn.classList.remove("hidden");
     const mode = level.untimed ? FREE_MODE : selectedMode;
     const { rows, cols } = visibleAxes(level);
     session = {

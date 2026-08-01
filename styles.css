@@ -111,7 +111,25 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px;
+  margin-bottom: 24px;
 }
+
+.playground-grid {
+  grid-template-columns: 1fr;
+}
+
+.playground-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.14), rgba(167, 139, 250, 0.14));
+  border: 2px solid rgba(56, 189, 248, 0.35);
+  padding: 18px 20px;
+}
+
+.playground-card .level-code { color: var(--accent); }
+.playground-card .level-name { font-size: 1.1rem; }
+.playground-card .level-desc { color: var(--muted); font-size: 0.85rem; }
 
 .level-card {
   background: var(--panel);
@@ -433,6 +451,14 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 .cell-ref {
   color: #3f5170;
   font-size: 0.8em;
+  background: #0b1120;
+}
+
+/* The browsable reference chart shows the actual product, front and center */
+.cell-ref-answer {
+  color: var(--text);
+  font-size: 1em;
+  font-weight: 700;
   background: #0b1120;
 }
 
