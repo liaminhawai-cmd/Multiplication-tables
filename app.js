@@ -145,14 +145,6 @@
     return out;
   }
   function round2(n) { return Math.round(n * 100) / 100; }
-  function shuffle(arr) {
-    const out = arr.slice();
-    for (let i = out.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [out[i], out[j]] = [out[j], out[i]];
-    }
-    return out;
-  }
 
   // ---------- Progress storage ----------
   const STORAGE_KEY = "multab_progress_v1";
@@ -200,30 +192,28 @@
   // Picks 15–25 facts to drill: recently-missed facts first (most recent
   // miss wins ties), falling back to unseen facts from a modest range if
   // there isn't enough miss history yet to fill the set.
+  // A weak-spots level is only meaningful once there's real miss history to
+  // build it from — below this it would just be a random grid wearing a
+  // "personalized" label, so the level stays locked instead.
+  const MIN_WEAK_FACTS = 6;
+
+  // Every fact this player has actually got wrong in this domain, most
+  // recently missed first, miss count breaking ties. No padding with unseen
+  // facts: everything here is something they really missed.
   function pickWeakFacts(domain) {
     const bucket = factStats[domain] || {};
-    const missed = Object.keys(bucket)
+    return Object.keys(bucket)
       .map((key) => {
         const [a, b] = key.split(",").map(Number);
         return { a, b, ...bucket[key] };
       })
       .filter((f) => f.wrong > 0)
-      .sort((x, y) => (y.lastWrongAt || 0) - (x.lastWrongAt || 0) || y.wrong - x.wrong);
+      .sort((x, y) => (y.lastWrongAt || 0) - (x.lastWrongAt || 0) || y.wrong - x.wrong)
+      .slice(0, 25);
+  }
 
-    const picked = missed.slice(0, 25);
-    if (picked.length < 15) {
-      const pool = domain === "decimal" ? DECIMAL_AXIS : range(1, 12);
-      const seen = new Set(picked.map((p) => factKey(p.a, p.b)));
-      const candidates = shuffle(pool.flatMap((a) => pool.filter((b) => b >= a).map((b) => ({ a, b }))));
-      for (const cand of candidates) {
-        const key = factKey(cand.a, cand.b);
-        if (seen.has(key)) continue;
-        picked.push(cand);
-        seen.add(key);
-        if (picked.length >= 15) break;
-      }
-    }
-    return picked;
+  function weakFactCount(domain) {
+    return pickWeakFacts(domain).length;
   }
 
   // Personalized levels have no fixed axis/target — rebuild them from the
@@ -328,14 +318,29 @@
   ];
 
   function buildLevelCard(lvl) {
-    const locked = lvl.prereq && !isLevelBeaten(lvl.prereq);
+    const prereqLocked = lvl.prereq && !isLevelBeaten(lvl.prereq);
+    // Weak-spots levels need real mistakes on the board before they mean anything.
+    const missCount = lvl.dynamic ? weakFactCount(lvl.domain) : 0;
+    const needsMisses = lvl.dynamic && missCount < MIN_WEAK_FACTS;
+    const locked = prereqLocked || needsMisses;
     const card = document.createElement("button");
     card.className = "level-card" + (locked ? " locked" : "") + (lvl.immediateFeedback ? " playground-card" : "");
     card.type = "button";
     card.disabled = locked;
     if (selectedLevel && selectedLevel.id === lvl.id) card.classList.add("selected");
 
-    if (locked) {
+    if (needsMisses) {
+      const domainLabel = lvl.domain === "decimal" ? "decimal" : "times table";
+      card.innerHTML = `
+        <div class="level-code">🔒 Locked</div>
+        <div class="level-name">${lvl.name}</div>
+        <div class="level-lock-hint">Play some ${domainLabel} levels first — ${missCount}/${MIN_WEAK_FACTS} missed facts collected</div>
+      `;
+      card.title = `This builds itself from facts you get wrong. ${missCount} of ${MIN_WEAK_FACTS} so far.`;
+      return card;
+    }
+
+    if (prereqLocked) {
       const prereqName = LEVELS.find((l) => l.id === lvl.prereq)?.name || lvl.prereq;
       card.innerHTML = `
         <div class="level-code">🔒 Locked</div>
@@ -727,6 +732,12 @@
     pendingAdvanceTimeout = null;
     requestFullscreenSafe();
     const level = selectedLevel;
+    // Guard the dynamic levels: without enough real misses there's nothing
+    // personalized to build a grid from.
+    if (level.dynamic && weakFactCount(level.domain) < MIN_WEAK_FACTS) {
+      renderLevelGrid();
+      return;
+    }
     if (level.dynamic) refreshDynamicLevel(level);
     quitBtn.textContent = "Quit";
     const mode = level.untimed ? FREE_MODE : selectedMode;
