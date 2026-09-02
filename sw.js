@@ -1,4 +1,4 @@
-const CACHE_NAME = "multab-cache-v1";
+const CACHE_NAME = "multab-cache-v2";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,12 @@ const CORE_ASSETS = [
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-512-maskable.png",
+  "./fractions/index.html",
+  "./fractions/styles.css",
+  "./fractions/engine.js",
+  "./fractions/models.js",
+  "./fractions/interactives.js",
+  "./fractions/data/cells.js",
 ];
 
 self.addEventListener("install", (event) => {

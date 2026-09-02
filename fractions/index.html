@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fractions Hub — Teach and Drill</title>
+<meta name="theme-color" content="#0f172a" />
+<link rel="icon" href="../icons/icon-192.png" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="app-header">
+  <a class="hub-link" href="../index.html">✕ Times Tables Trainer</a>
+  <h1>½ Fractions Hub</h1>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="practise">Practise</button>
+    <button class="tab-btn" data-tab="report">Report</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============ PRACTISE TAB ============ -->
+  <section id="tab-practise" class="tab-panel active">
+
+    <!-- grid: pick cells -->
+    <div id="screen-grid" class="screen active">
+      <div class="filter-row" id="modeToggle"></div>
+      <div class="matrix" id="matrix"></div>
+      <div class="matrix-legend" id="matrixLegend"></div>
+      <p class="help" id="helpText"></p>
+      <div id="tierRow" class="tier-row hidden">
+        <span class="eyebrow">Pace</span>
+        <div id="tierChips" class="tier-chips"></div>
+      </div>
+      <button id="startBtn" class="primary-btn" disabled>Pick a cell</button>
+    </div>
+
+    <!-- teach cycle -->
+    <div id="screen-teach" class="screen">
+      <div class="progress-row">
+        <span id="teachPhase">Learning goals</span>
+        <button id="teachQuitBtn" class="exit-btn">Exit</button>
+      </div>
+      <div class="progress-track"><div id="teachBar" class="progress-fill"></div></div>
+      <div id="teachSub" class="teach-sub"></div>
+      <div id="teachContent"></div>
+      <div class="start-bar"><button id="teachNextBtn" class="primary-btn">Next</button></div>
+    </div>
+
+    <!-- timed drill -->
+    <div id="screen-drill" class="screen">
+      <div id="pauseOverlay" class="pause-overlay hidden">
+        <div class="pause-card">
+          <p class="pause-title">Paused — you left the drill screen</p>
+          <p class="pause-sub">No calculators, no other tabs. Press Play to start this drill again from the beginning.</p>
+          <button id="pausePlayBtn" class="primary-btn inline">▶ Play</button>
+        </div>
+      </div>
+      <div id="cheatBanner" class="cheat-banner hidden">You left the drill screen — drill restarted.</div>
+      <div class="quiz-hud">
+        <div class="hud-item"><span class="hud-label">Cells</span><span id="hudCells" class="hud-value">-</span></div>
+        <div class="hud-item"><span class="hud-label">Time</span><span id="hudTimer" class="hud-value">0:00</span></div>
+        <div class="hud-item"><span class="hud-label">Pace</span><span id="hudTier" class="hud-value">-</span></div>
+        <div class="hud-item"><span class="hud-label">Done</span><span id="hudDone" class="hud-value">0</span></div>
+      </div>
+      <div class="timer-bar-track"><div id="timerBar" class="timer-bar-fill"></div></div>
+      <div class="question-card">
+        <div id="qTag" class="q-tag"></div>
+        <div id="qPrompt" class="q-prompt"></div>
+        <div id="qText" class="q-text"></div>
+        <div id="qAnswer" class="q-answer"></div>
+        <div id="qFeedback" class="feedback" aria-live="polite"></div>
+        <button id="qNextBtn" class="secondary-btn inline hidden">Next ↵</button>
+      </div>
+      <div class="table-scroll log-scroll">
+        <table class="log-table"><thead><tr><th>#</th><th>Question</th><th>Your answer</th></tr></thead><tbody id="drillLogBody"></tbody></table>
+      </div>
+      <button id="quitBtn" class="secondary-btn">Quit</button>
+    </div>
+
+    <!-- results -->
+    <div id="screen-results" class="screen">
+      <h2 id="resultsTitle">Time's up</h2>
+      <div class="results-summary">
+        <div class="result-stat"><span id="resCorrect">0</span><label>Correct</label></div>
+        <div class="result-stat"><span><span id="resTotal">0</span><small> of </small><span id="resPlanned">0</span></span><label>Answered</label></div>
+        <div class="result-stat"><span id="resAccuracy">0%</span><label>Accuracy</label></div>
+        <div class="result-stat"><span id="resTime">0:00</span><label>Time</label></div>
+      </div>
+      <div id="resCells"></div>
+      <div id="resMisses"></div>
+      <div class="results-actions">
+        <button id="retryBtn" class="primary-btn">Retry</button>
+        <button id="resTeachBtn" class="secondary-btn">Teach</button>
+        <button id="resBackBtn" class="secondary-btn">Back to the grid</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REPORT TAB ============ -->
+  <section id="tab-report" class="tab-panel">
+    <h2>Progress report</h2>
+    <p class="muted noprint">What this shows: first-try answers in timed drills, and which teach cycles were finished. What it cannot tell you: whether a calculator or a friend helped, or whether the method was understood or pattern-matched. Nothing leaves this device unless you copy or download it.</p>
+    <div class="report-overview" id="reportOverview"></div>
+    <div class="matrix" id="reportMatrix"></div>
+    <div class="matrix-legend"><span class="lg"><i class="dot t120"></i>beaten at 2:00 per cell</span><span class="lg"><i class="dot t90"></i>at 1:30</span><span class="lg"><i class="dot t60"></i>at 1:00</span><span class="lg"><span class="ttick">taught</span> teach cycle finished</span></div>
+    <div id="reportMisses"></div>
+    <div id="reportHistory"></div>
+    <div class="export-row noprint">
+      <input id="studentName" class="name-input" type="text" maxlength="40" autocomplete="name" placeholder="Your name (for the export)" aria-label="your name for the export">
+      <button id="copyTsvBtn" class="secondary-btn inline">Copy row for sheet</button>
+      <button id="copyTextBtn" class="secondary-btn inline">Copy teacher text</button>
+      <button id="downloadCsvBtn" class="secondary-btn inline">Download CSV</button>
+      <button id="printBtn" class="secondary-btn inline">Print / save as PDF</button>
+    </div>
+    <div id="copyNote" class="copy-note noprint" aria-live="polite"></div>
+    <button id="resetBtn" class="secondary-btn danger noprint">Reset all fractions progress</button>
+  </section>
+</main>
+
+<footer class="app-footer">
+  <p>Fractions Hub · progress is saved in this browser only. <span id="buildTag" class="build-tag"></span></p>
+</footer>
+
+<!-- load order matters: content, models, interactives, then the engine -->
+<script src="data/cells.js"></script>
+<script src="models.js"></script>
+<script src="interactives.js"></script>
+<script src="engine.js"></script>
+</body>
+</html>
