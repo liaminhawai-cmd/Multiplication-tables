@@ -729,6 +729,7 @@
     wireFrac(host, it.form, submitDrill);
     $("qFeedback").className = "feedback"; $("qFeedback").innerHTML = "";
     $("qNextBtn").classList.add("hidden");
+    $("qCheckBtn").classList.remove("hidden");
   }
   function submitDrill() {
     if (!drill || drill.locked) return;
@@ -737,6 +738,7 @@
     const resp = readFrac($("qAnswer"));
     const r = FH.check(it, resp);
     drill.locked = true; drill.answered = true;
+    $("qCheckBtn").classList.add("hidden");
     drill.attempted++;
     if (r.correct) drill.right++;
     drill.log.push({ forCell: e.forCell, review: e.review, q: FH.questionText(it), given: givenText(resp), ans: FH.answerText(it), correct: r.correct, why: r.why || "", rule: FH.explain(it) });
@@ -766,6 +768,7 @@
     if (drill.idx >= drill.queue.length) finishDrill(true); else showDrillQuestion();
   }
   $("qNextBtn").addEventListener("click", advanceDrill);
+  $("qCheckBtn").addEventListener("click", submitDrill);
   // Enter anywhere on the drill screen advances after a wrong answer — unless
   // focus is on a button or input, which handle Enter themselves.
   document.addEventListener("keydown", (e) => {
