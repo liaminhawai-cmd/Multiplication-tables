@@ -88,8 +88,10 @@
         <div class="result-stat"><span id="resAccuracy">0%</span><label>Accuracy</label></div>
         <div class="result-stat"><span id="resTime">0:00</span><label>Time</label></div>
       </div>
-      <div id="resCells"></div>
-      <div id="resMisses"></div>
+      <div class="scroll-area">
+        <div id="resCells"></div>
+        <div id="resMisses"></div>
+      </div>
       <div class="results-actions">
         <button id="retryBtn" class="primary-btn">Retry</button>
         <button id="resTeachBtn" class="secondary-btn">Teach</button>
@@ -101,12 +103,14 @@
   <!-- ============ REPORT TAB ============ -->
   <section id="tab-report" class="tab-panel">
     <h2>Progress report</h2>
-    <p class="muted noprint">What this shows: first-try answers in timed drills, and which teach cycles were finished. What it cannot tell you: whether a calculator or a friend helped, or whether the method was understood or pattern-matched. Nothing leaves this device unless you copy or download it.</p>
-    <div class="report-overview" id="reportOverview"></div>
-    <div class="matrix" id="reportMatrix"></div>
-    <div class="matrix-legend"><span class="lg"><i class="dot t120"></i>beaten at 2:00 per cell</span><span class="lg"><i class="dot t90"></i>at 1:30</span><span class="lg"><i class="dot t60"></i>at 1:00</span><span class="lg"><span class="ttick">taught</span> teach cycle finished</span></div>
-    <div id="reportMisses"></div>
-    <div id="reportHistory"></div>
+    <div class="scroll-area">
+      <p class="muted noprint">What this shows: first-try answers in timed drills, and which teach cycles were finished. What it cannot tell you: whether a calculator or a friend helped, or whether the method was understood or pattern-matched. Nothing leaves this device unless you copy or download it.</p>
+      <div class="report-overview" id="reportOverview"></div>
+      <div class="matrix" id="reportMatrix"></div>
+      <div class="matrix-legend"><span class="lg"><i class="dot t120"></i>beaten at 2:00 per cell</span><span class="lg"><i class="dot t90"></i>at 1:30</span><span class="lg"><i class="dot t60"></i>at 1:00</span><span class="lg"><span class="ttick">taught</span> teach cycle finished</span></div>
+      <div id="reportMisses"></div>
+      <div id="reportHistory"></div>
+    </div>
     <div class="export-row noprint">
       <input id="studentName" class="name-input" type="text" maxlength="40" autocomplete="name" placeholder="Your name (for the export)" aria-label="your name for the export">
       <button id="copyTsvBtn" class="secondary-btn inline">Copy row for sheet</button>

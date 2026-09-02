@@ -10,7 +10,11 @@
   --radius: 14px;
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: linear-gradient(160deg, #0f172a, #1e1b4b); color: var(--ink); min-height: 100vh; }
+/* One view, no page scroll: the shell is exactly the viewport tall and each
+   screen nominates its own scrolling region (see "scroll regions" below). */
+html { height: 100%; }
+body { margin: 0; font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: linear-gradient(160deg, #0f172a, #1e1b4b); color: var(--ink);
+  height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
 button { font-family: inherit; }
 .hidden { display: none !important; }
 .muted { color: var(--muted); font-size: .9rem; line-height: 1.5; }
@@ -18,18 +22,18 @@ h2 { font-size: 1.1rem; color: var(--muted); margin: 22px 0 10px; }
 h3 { font-size: 1rem; color: var(--muted); margin: 18px 0 8px; }
 small { font-size: .8em; }
 
-.app-header { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 16px 10px; position: relative; }
-.app-header h1 { margin: 0; font-size: 1.8rem; background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.hub-link { position: absolute; left: 16px; top: 14px; font-size: .8rem; color: var(--muted); text-decoration: none; }
+.app-header { flex: none; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; }
+.app-header h1 { margin: 0; flex: 1; text-align: center; font-size: 1.3rem; white-space: nowrap; background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hub-link { flex: none; font-size: .8rem; color: var(--muted); text-decoration: none; white-space: nowrap; }
 .hub-link:hover { color: var(--ink); text-decoration: underline; }
-.tabs { display: flex; gap: 8px; background: var(--panel); padding: 6px; border-radius: 999px; }
-.tab-btn { border: none; background: transparent; color: var(--muted); padding: 8px 22px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: .95rem; }
+.tabs { flex: none; display: flex; gap: 6px; background: var(--panel); padding: 4px; border-radius: 999px; }
+.tab-btn { border: none; background: transparent; color: var(--muted); padding: 6px 16px; border-radius: 999px; cursor: pointer; font-weight: 600; font-size: .88rem; }
 .tab-btn.active { background: linear-gradient(90deg, var(--accent), var(--accent-2)); color: #0f172a; }
-main { max-width: 900px; margin: 0 auto; padding: 12px 16px 60px; }
+main { flex: 1 1 auto; min-height: 0; width: 100%; max-width: 900px; margin: 0 auto; padding: 8px 16px 6px; display: flex; flex-direction: column; }
 body.wide main { max-width: 1200px; }
-.tab-panel { display: none; } .tab-panel.active { display: block; }
-.screen { display: none; } .screen.active { display: block; }
-.app-footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 20px; }
+.tab-panel { display: none; } .tab-panel.active { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; }
+.screen { display: none; } .screen.active { display: flex; flex: 1 1 auto; min-height: 0; flex-direction: column; }
+.app-footer { flex: none; text-align: center; color: var(--muted); font-size: .7rem; padding: 4px 16px 6px; }
 .build-tag { font-family: monospace; font-size: .7rem; opacity: .5; }
 
 /* ---- buttons ---- */
@@ -238,6 +242,90 @@ svg.numline .mark.fa { fill: var(--fa); } svg.numline .mark.fr-fill { fill: var(
 .name-input { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: #0b1120; color: var(--ink); min-width: 220px; }
 .copy-note { color: var(--muted); font-size: .85rem; min-height: 1.2em; margin-top: 8px; }
 
+/* ---- scroll regions ----------------------------------------------------
+   Every screen names ONE region that takes the slack and scrolls; everything
+   else keeps its natural size. The page itself never scrolls (see the shell
+   at the top of this file), so a laptop shows the whole task at once. */
+.scroll-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+
+#screen-grid > *:not(#matrix) { flex: none; }
+#matrix { flex: 1 1 auto; min-height: 0; overflow: auto; }
+#matrix .mrow { flex: 1 1 auto; max-height: 88px; }
+#matrix .mhead { flex: none; }
+
+#screen-teach > *:not(#teachContent) { flex: none; }
+#teachContent { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+
+#screen-drill > *:not(.log-scroll) { flex: none; }
+#screen-drill .question-card { flex: 0 1 auto; overflow-y: auto; }
+#screen-drill .log-scroll { flex: 1 1 auto; min-height: 48px; max-height: none; }
+
+#screen-results > *:not(.scroll-area) { flex: none; }
+#tab-report > *:not(.scroll-area) { flex: none; }
+
+/* ---- short viewports (most laptops are 800px or less of usable height) ---- */
+@media (max-height: 820px) {
+  .app-header { padding: 6px 14px; }
+  .app-header h1 { font-size: 1.1rem; }
+  h2 { font-size: 1rem; margin: 10px 0 6px; }
+  h3 { margin: 12px 0 6px; }
+  main { padding: 6px 14px 4px; }
+  .filter-row { margin: 4px 0 8px; }
+  .mcell { min-height: 48px; padding: 6px; }
+  .cell-eg { font-size: .68rem; }
+  .help { margin: 8px 0; font-size: .82rem; }
+  .primary-btn { padding: 11px 24px; margin-top: 10px; font-size: .95rem; }
+  .secondary-btn { padding: 9px 18px; margin-top: 8px; }
+  .hud-item { padding: 5px; }
+  .hud-value { font-size: 1rem; }
+  .timer-bar-track { margin-bottom: 10px; }
+  .question-card { padding: 12px 16px; }
+  .q-text { font-size: 1.8rem; margin: 4px 0; }
+  .frac-input { margin: 8px 0; }
+  .fi { font-size: 1.35rem; width: 62px; padding: 5px 4px; }
+  .fi-w { width: 52px; } .fi-line { width: 62px; }
+  .watch-q { font-size: 1.3rem; padding: 10px; margin-bottom: 8px; }
+  .watch-q.big { font-size: 1.7rem; }
+  .watch-text, .build-say { font-size: .95rem; }
+  .li-text { font-size: 1.05rem; }
+  .models .cake, .cake-row .cake { width: 84px; height: 84px; }
+  .cake-group { padding: 8px 10px; }
+  .results-summary { margin: 10px 0; }
+  .result-stat { padding: 10px 6px; }
+  .result-stat > span { font-size: 1.3rem; }
+  .overview-card { padding: 10px; }
+  .overview-card span { font-size: 1.25rem; }
+}
+
+/* laptops are wide and short: spend width to buy back height. The build
+   step's groups sit side by side instead of stacking. */
+@media (min-width: 1000px) {
+  #buildStage { display: flex; align-items: flex-start; gap: 10px; }
+  #buildStage .cake-group { flex: 1 1 0; min-width: 0; margin-bottom: 0; }
+  body.wide main { max-width: 1200px; }
+}
+/* the height freed by going side by side goes back into the cakes, so the
+   slices are big enough to tap accurately */
+@media (min-width: 1000px) and (min-height: 760px) {
+  #buildStage .cake-group .cake { width: 148px; height: 148px; }
+  #buildStage .cake-group[data-gid="P"] .cake { width: 54px; height: 54px; }
+}
+
+/* netbook / small laptop: shrink the manipulatives, not the controls */
+@media (max-height: 700px) {
+  .models .cake, .cake-row .cake { width: 66px; height: 66px; }
+  .pieces .cake { width: 38px; height: 38px; }
+  .cake-group { padding: 6px 8px; margin-bottom: 6px; }
+  .cb-cakes { min-height: 0; }
+  .model-block { padding: 6px 10px; }
+  .watch-q { font-size: 1.15rem; padding: 8px; }
+  .watch-q.big { font-size: 1.5rem; }
+  .build-say, .watch-text { font-size: .9rem; padding: 8px 10px; }
+  .q-text { font-size: 1.5rem; }
+  .teach-sub { margin: 4px 0 8px; }
+  .mini { min-height: 34px; min-width: 34px; padding: 4px 8px; }
+}
+
 @media (max-width: 560px) {
   .results-summary, .quiz-hud { grid-template-columns: repeat(2, 1fr); }
   .q-text { font-size: 1.8rem; }
@@ -247,6 +335,8 @@ svg.numline .mark.fa { fill: var(--fa); } svg.numline .mark.fr-fill { fill: var(
   * { transition: none !important; animation: none !important; }
 }
 @media print {
+  html, body { height: auto; overflow: visible; display: block; }
+  .scroll-area, #teachContent, .log-scroll, #matrix { overflow: visible; max-height: none; }
   body { background: #fff; color: #000; }
   .app-header, .app-footer, #tab-practise, .noprint { display: none !important; }
   #tab-report { display: block !important; }
